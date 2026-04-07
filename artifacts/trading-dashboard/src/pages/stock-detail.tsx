@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 import { useGetSignalByTicker } from "@workspace/api-client-react";
-import { SignalBadge, ConfidenceBadge } from "@/components/signal-badge";
+import { ConfidenceBadge } from "@/components/signal-badge";
 import { ProbabilityBar, getSignalNoteFromValues } from "@/components/stock-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -167,10 +167,7 @@ export default function StockDetail() {
                   </p>
                 )}
               </div>
-              <div className="flex flex-col gap-2">
-                <SignalBadge signal={stock.signal} size="lg" />
-                <ConfidenceBadge tier={stock.confidenceTier} size="lg" />
-              </div>
+              <ConfidenceBadge tier={stock.confidenceTier} size="lg" />
             </div>
             
             <div className="flex items-baseline gap-3">

@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "wouter";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { SignalBadge, ConfidenceBadge } from "./signal-badge";
+import { ConfidenceBadge } from "./signal-badge";
 import { cn } from "@/lib/utils";
 import type { StockSignal } from "@workspace/api-client-react/src/generated/api.schemas";
 
@@ -95,10 +95,7 @@ export function StockCard({ signal }: { signal: StockSignal }) {
                 </p>
               )}
             </div>
-            <div className="flex flex-col items-end gap-1.5">
-              <SignalBadge signal={signal.signal} />
-              <ConfidenceBadge tier={signal.confidenceTier} />
-            </div>
+            <ConfidenceBadge tier={signal.confidenceTier} />
           </div>
 
           <div className="space-y-1">
