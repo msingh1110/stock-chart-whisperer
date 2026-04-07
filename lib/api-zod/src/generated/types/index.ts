@@ -7,6 +7,7 @@
  */
 
 export * from "./apiError";
+export * from "./confidenceTier";
 export * from "./healthStatus";
 export * from "./portfolioSummary";
 export * from "./priceBar";

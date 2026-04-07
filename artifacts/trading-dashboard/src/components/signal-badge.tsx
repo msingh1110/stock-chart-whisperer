@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import type { SignalType } from "@workspace/api-client-react/src/generated/api.schemas";
+import type { SignalType, ConfidenceTier } from "@workspace/api-client-react/src/generated/api.schemas";
 
 interface SignalBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   signal: SignalType;
@@ -8,9 +8,8 @@ interface SignalBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export function SignalBadge({ signal, size = "md", className, ...props }: SignalBadgeProps) {
-  const isBuy = signal === "BUY";
+  const isBuy  = signal === "BUY";
   const isSell = signal === "SELL";
-  const isHold = signal === "HOLD";
 
   return (
     <div
@@ -19,14 +18,45 @@ export function SignalBadge({ signal, size = "md", className, ...props }: Signal
         size === "sm" && "text-[10px] px-1.5 py-0.5 rounded-sm",
         size === "md" && "text-xs px-2.5 py-1 rounded-sm tracking-wider",
         size === "lg" && "text-sm px-4 py-1.5 rounded tracking-widest",
-        isBuy && "bg-[#00ff00]/10 text-[#00ff00] border-[#00ff00]/30 shadow-[0_0_10px_rgba(0,255,0,0.15)]",
+        isBuy  && "bg-[#00ff00]/10 text-[#00ff00] border-[#00ff00]/30 shadow-[0_0_10px_rgba(0,255,0,0.15)]",
         isSell && "bg-[#ff0000]/10 text-[#ff0000] border-[#ff0000]/30 shadow-[0_0_10px_rgba(255,0,0,0.15)]",
-        isHold && "bg-[#ffcc00]/10 text-[#ffcc00] border-[#ffcc00]/30 shadow-[0_0_10px_rgba(255,204,0,0.15)]",
+        !isBuy && !isSell && "bg-[#ffcc00]/10 text-[#ffcc00] border-[#ffcc00]/30 shadow-[0_0_10px_rgba(255,204,0,0.15)]",
         className
       )}
       {...props}
     >
       {signal}
+    </div>
+  );
+}
+
+const TIER_STYLES: Record<string, string> = {
+  "STRONG BUY":  "bg-emerald-400/10 text-emerald-400 border-emerald-400/30 shadow-[0_0_8px_rgba(52,211,153,0.15)]",
+  "BUY":         "bg-green-500/10 text-green-400 border-green-500/30",
+  "HOLD":        "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
+  "SELL":        "bg-orange-500/10 text-orange-400 border-orange-500/30",
+  "STRONG SELL": "bg-red-600/10 text-red-400 border-red-600/30 shadow-[0_0_8px_rgba(220,38,38,0.15)]",
+};
+
+interface ConfidenceBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
+  tier: ConfidenceTier;
+  size?: "sm" | "md" | "lg";
+}
+
+export function ConfidenceBadge({ tier, size = "md", className, ...props }: ConfidenceBadgeProps) {
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center justify-center font-mono font-semibold border uppercase tracking-wider",
+        size === "sm" && "text-[9px] px-1.5 py-0.5 rounded-sm",
+        size === "md" && "text-[10px] px-2 py-0.5 rounded-sm",
+        size === "lg" && "text-xs px-3 py-1 rounded",
+        TIER_STYLES[tier] ?? TIER_STYLES["HOLD"],
+        className
+      )}
+      {...props}
+    >
+      {tier}
     </div>
   );
 }

@@ -7,14 +7,20 @@
  */
 import type { PriceBar } from "./priceBar";
 import type { SignalType } from "./signalType";
+import type { ConfidenceTier } from "./confidenceTier";
 
 export interface StockSignalDetail {
   ticker: string;
   currentPrice: number;
+  /** Previous session closing price */
+  prevClose: number;
   ma20: number;
   ma50: number;
   rsi: number;
+  /** Closing price 5 trading days ago */
+  price5dAgo: number;
   signal: SignalType;
+  confidenceTier: ConfidenceTier;
   change: number;
   changePercent: number;
   lastUpdated: string;
@@ -22,9 +28,17 @@ export interface StockSignalDetail {
   upProbability: number;
   /** Probability score (0-100) that the stock moves down */
   downProbability: number;
-  /** Raw sigmoid input score from the weighted scoring model */
-  score: number;
-  /** 5-day price momentum as a decimal fraction */
+  /** Weighted final score in roughly [-1, +1] */
+  finalScore: number;
+  /** Trend component score in [-1, +1] */
+  trendScore: number;
+  /** Momentum component score in [-1, +1] */
+  momentumScore: number;
+  /** RSI component score */
+  rsiScore: number;
+  /** Volume confirmation score (-1, 0, or +1) */
+  volumeScore: number;
+  /** Raw 5-day price momentum as a decimal fraction */
   momentum: number;
   /** Most-recent bar volume */
   volume: number;

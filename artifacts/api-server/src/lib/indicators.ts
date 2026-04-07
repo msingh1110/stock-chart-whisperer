@@ -1,59 +1,45 @@
 import { DailyBar } from "./alpaca";
 
+// ── Simple Indicators ──────────────────────────────────────────────────────
+
 /**
- * Compute simple moving average over the last `period` values ending at index `i`.
- * Returns null if there aren't enough data points yet.
+ * Simple moving average over the last `period` closes ending at index `i`.
  */
 export function sma(closes: number[], i: number, period: number): number | null {
   if (i < period - 1) return null;
   let sum = 0;
-  for (let j = i - period + 1; j <= i; j++) {
-    sum += closes[j];
-  }
+  for (let j = i - period + 1; j <= i; j++) sum += closes[j];
   return sum / period;
 }
 
 /**
- * Compute RSI matching ta.momentum.RSIIndicator(close, window=14).rsi().
- *
- * The ta library uses pandas EWM with adjust=False and alpha=1/window:
- *   up[i]    = max(0, close[i] - close[i-1])
- *   dn[i]    = max(0, close[i-1] - close[i])
- *   emaUp[i] = (1 - alpha) * emaUp[i-1] + alpha * up[i]   (seeded at index 1)
- *   emaDn[i] = (1 - alpha) * emaDn[i-1] + alpha * dn[i]
- *   RSI[i]   = 100 - 100 / (1 + emaUp[i] / emaDn[i])
- *
- * Returns null until min_periods (= window) bars have been processed.
+ * RSI matching ta.momentum.RSIIndicator(close, window=14).rsi().
+ * Uses pandas EWM with adjust=False and alpha=1/window.
  */
 export function computeRSI(closes: number[], period = 14): (number | null)[] {
   const rsi: (number | null)[] = new Array(closes.length).fill(null);
   if (closes.length < period + 1) return rsi;
 
   const alpha = 1 / period;
-
-  // Seed EWM with the very first delta (index 1), matching adjust=False behaviour
   const firstDelta = closes[1] - closes[0];
   let ewmUp = Math.max(0, firstDelta);
   let ewmDn = Math.max(0, -firstDelta);
 
   for (let i = 2; i < closes.length; i++) {
     const delta = closes[i] - closes[i - 1];
-    const up = Math.max(0, delta);
-    const dn = Math.max(0, -delta);
-
-    ewmUp = (1 - alpha) * ewmUp + alpha * up;
-    ewmDn = (1 - alpha) * ewmDn + alpha * dn;
-
-    // Emit value only after min_periods bars (index >= period)
+    ewmUp = (1 - alpha) * ewmUp + alpha * Math.max(0, delta);
+    ewmDn = (1 - alpha) * ewmDn + alpha * Math.max(0, -delta);
     if (i >= period) {
       rsi[i] = ewmDn === 0 ? 100 : 100 - 100 / (1 + ewmUp / ewmDn);
     }
   }
-
   return rsi;
 }
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
 export type SignalType = "BUY" | "SELL" | "HOLD";
+export type ConfidenceTier = "STRONG BUY" | "BUY" | "HOLD" | "SELL" | "STRONG SELL";
 
 export interface PriceBarWithIndicators {
   date: string;
@@ -69,98 +55,145 @@ export interface PriceBarWithIndicators {
 export interface StockAnalysis {
   ticker: string;
   currentPrice: number;
+  prevClose: number;
   ma20: number;
   ma50: number;
   rsi: number;
+  price5dAgo: number;
   signal: SignalType;
+  confidenceTier: ConfidenceTier;
   change: number;
   changePercent: number;
   lastUpdated: string;
   upProbability: number;
   downProbability: number;
-  /** Raw sigmoid input score */
-  score: number;
-  /** 5-day price momentum: (price - price5dAgo) / price5dAgo */
+  finalScore: number;
+  trendScore: number;
+  momentumScore: number;
+  rsiScore: number;
+  volumeScore: number;
   momentum: number;
-  /** Most-recent bar volume */
   volume: number;
-  /** Average daily volume over last 20 bars */
   averageVolume: number;
-  /** current volume / average volume */
   volumeRatio: number;
   priceHistory: PriceBarWithIndicators[];
 }
 
+// ── Scoring Config (tune weights & thresholds here) ───────────────────────
+
+const WEIGHTS = {
+  trend:    0.4,
+  momentum: 0.3,
+  rsi:      0.2,
+  volume:   0.1,
+} as const;
+
+// upProbability is in 0–100 range throughout
+const THRESHOLDS = {
+  strongBuy:  80,
+  buy:        65,
+  sell:       35, // upProb <= 35 ⟺ downProb >= 65
+  strongSell: 20, // upProb <= 20 ⟺ downProb >= 80
+} as const;
+
+// ── Component Scorers ──────────────────────────────────────────────────────
+
 /**
- * Sigmoid / logistic function.
+ * Trend score in [-1, +1].
+ *   +0.5 if price > MA20 else -0.5
+ *   +0.5 if MA20  > MA50 else -0.5
  */
-function sigmoid(x: number): number {
-  return 1 / (1 + Math.exp(-x));
+function computeTrendScore(price: number, ma20: number, ma50: number): number {
+  return (price > ma20 ? 0.5 : -0.5) + (ma20 > ma50 ? 0.5 : -0.5);
 }
 
 /**
- * Calibrated probability-based signal engine.
- *
- * Builds a continuous weighted score from five factors:
- *   A) Short-term trend  : 2 * (price - MA20) / MA20
- *   B) Long-term trend   : 2 * (MA20 - MA50) / MA50
- *   C) RSI contribution  : +1 (50–65), -1 (>70 or <45), 0 otherwise
- *   D) 5-day momentum    : 1.5 * (price - price5dAgo) / price5dAgo
- *   E) Volume confirm.   : ±1 * (volume_ratio - 1) depending on direction
- *
- * Converts score → probability via sigmoid:
- *   upProbability   = sigmoid(score) * 100  (0–100)
- *   downProbability = (1 - sigmoid(score)) * 100
+ * Momentum score in [-1, +1].
+ * raw = (price - price5dAgo) / price5dAgo
+ * Clamped: max(-1, min(1, raw * 5))
  */
-export function computeProbability(
-  currentPrice: number,
-  ma20: number,
-  ma50: number,
-  rsi: number,
-  currentVolume: number,
-  avgVolume: number,
+function computeMomentumScore(price: number, price5dAgo: number): number {
+  const raw = (price - price5dAgo) / price5dAgo;
+  return Math.max(-1, Math.min(1, raw * 5));
+}
+
+/**
+ * RSI score in [-1, +1].
+ *   rsi < 40  → -1   (bearish)
+ *   40–49     → -0.5 (weak)
+ *   50–65     → +0.5 (healthy bullish)
+ *   66–75     → +0.2 (extended, caution)
+ *   > 75      → -0.5 (overbought)
+ */
+function computeRsiScore(rsi: number): number {
+  if (rsi < 40)  return -1;
+  if (rsi < 50)  return -0.5;
+  if (rsi <= 65) return 0.5;
+  if (rsi <= 75) return 0.2;
+  return -0.5;
+}
+
+/**
+ * Volume confirmation score: -1, 0, or +1.
+ * Only fires when volume is meaningfully elevated (ratio > 1.2).
+ */
+function computeVolumeScore(
+  volumeRatio: number,
+  price: number,
   prevClose: number,
-  price5dAgo: number,
-): { upProbability: number; downProbability: number } {
-  let score = 0;
+): number {
+  if (volumeRatio > 1.2 && price > prevClose) return 1;
+  if (volumeRatio > 1.2 && price < prevClose) return -1;
+  return 0;
+}
 
-  // A. Short-term trend: price vs MA20
-  const trendShort = (currentPrice - ma20) / ma20;
-  score += 2 * trendShort;
+// ── Aggregation & Signal Mapping ───────────────────────────────────────────
 
-  // B. Long-term trend: MA20 vs MA50
-  const trendLong = (ma20 - ma50) / ma50;
-  score += 2 * trendLong;
+/**
+ * Weighted final score → stays roughly within [-1, +1].
+ */
+function aggregateScore(
+  trendScore: number,
+  momentumScore: number,
+  rsiScore: number,
+  volumeScore: number,
+): number {
+  return (
+    WEIGHTS.trend    * trendScore +
+    WEIGHTS.momentum * momentumScore +
+    WEIGHTS.rsi      * rsiScore +
+    WEIGHTS.volume   * volumeScore
+  );
+}
 
-  // C. RSI contribution
-  if (rsi >= 50 && rsi <= 65) score += 1;
-  else if (rsi > 70) score -= 1;
-  else if (rsi < 45) score -= 1;
-
-  // D. 5-day momentum
-  const momentum = (currentPrice - price5dAgo) / price5dAgo;
-  score += 1.5 * momentum;
-
-  // E. Volume confirmation
-  const volumeRatio = avgVolume > 0 ? currentVolume / avgVolume : 1;
-  if (currentPrice > prevClose) score += 1 * (volumeRatio - 1);
-  else if (currentPrice < prevClose) score -= 1 * (volumeRatio - 1);
-
-  const upProb = sigmoid(score);
-  const downProb = 1 - upProb;
-
+/**
+ * Linear normalization: up_prob = (finalScore + 1) / 2 clamped to [0, 1].
+ * Returns probabilities as 0–100 integers for the frontend.
+ */
+function scoreToProb(finalScore: number): { upProbability: number; downProbability: number } {
+  const up = Math.max(0, Math.min(1, (finalScore + 1) / 2));
   return {
-    score: Math.round(score * 10000) / 10000,
-    momentum: Math.round(momentum * 10000) / 10000,
-    volumeRatio: Math.round(volumeRatio * 10000) / 10000,
-    upProbability: Math.round(upProb * 100),
-    downProbability: Math.round(downProb * 100),
+    upProbability:   Math.round(up * 100),
+    downProbability: Math.round((1 - up) * 100),
   };
 }
 
-/**
- * Compute all indicators and generate a trading signal for a ticker.
- */
+function mapSignal(upProbability: number): SignalType {
+  if (upProbability >= THRESHOLDS.buy)  return "BUY";
+  if (upProbability <= THRESHOLDS.sell) return "SELL";
+  return "HOLD";
+}
+
+function mapConfidenceTier(upProbability: number): ConfidenceTier {
+  if (upProbability >= THRESHOLDS.strongBuy)  return "STRONG BUY";
+  if (upProbability >= THRESHOLDS.buy)        return "BUY";
+  if (upProbability <= THRESHOLDS.strongSell) return "STRONG SELL";
+  if (upProbability <= THRESHOLDS.sell)       return "SELL";
+  return "HOLD";
+}
+
+// ── Main Analyzer ──────────────────────────────────────────────────────────
+
 export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
   if (bars.length < 51) {
     throw new Error(
@@ -171,86 +204,88 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
   const closes = bars.map((b) => b.close);
   const n = closes.length;
 
-  // Compute MA20 and MA50 arrays
-  const ma20Arr: (number | null)[] = closes.map((_, i) => sma(closes, i, 20));
-  const ma50Arr: (number | null)[] = closes.map((_, i) => sma(closes, i, 50));
-  const rsiArr = computeRSI(closes, 14);
+  // Moving averages & RSI arrays
+  const ma20Arr = closes.map((_, i) => sma(closes, i, 20));
+  const ma50Arr = closes.map((_, i) => sma(closes, i, 50));
+  const rsiArr  = computeRSI(closes, 14);
 
-  // Build price history with indicators
+  // Price history for chart
   const priceHistory: PriceBarWithIndicators[] = bars.map((b, i) => ({
-    date: b.date,
-    close: b.close,
-    open: b.open,
-    high: b.high,
-    low: b.low,
+    date:   b.date,
+    close:  b.close,
+    open:   b.open,
+    high:   b.high,
+    low:    b.low,
     volume: b.volume,
-    ma20: ma20Arr[i] !== null ? Math.round(ma20Arr[i]! * 100) / 100 : null,
-    ma50: ma50Arr[i] !== null ? Math.round(ma50Arr[i]! * 100) / 100 : null,
+    ma20:   ma20Arr[i] !== null ? Math.round(ma20Arr[i]! * 100) / 100 : null,
+    ma50:   ma50Arr[i] !== null ? Math.round(ma50Arr[i]! * 100) / 100 : null,
   }));
 
-  // Current values
+  // Current indicators
   const currentPrice = closes[n - 1];
-  const ma20 = ma20Arr[n - 1]!;
-  const ma50 = ma50Arr[n - 1]!;
+  const ma20         = ma20Arr[n - 1]!;
+  const ma50         = ma50Arr[n - 1]!;
 
-  // Find last valid RSI
-  let rsi = 50; // default fallback
+  let rsi = 50;
   for (let i = n - 1; i >= 0; i--) {
-    if (rsiArr[i] !== null) {
-      rsi = Math.round(rsiArr[i]! * 100) / 100;
-      break;
-    }
+    if (rsiArr[i] !== null) { rsi = Math.round(rsiArr[i]! * 100) / 100; break; }
   }
 
-  // Previous close and 1-day change
-  const prevClose = closes[n - 2] ?? currentPrice;
-  const change = Math.round((currentPrice - prevClose) * 100) / 100;
-  const changePercent =
-    Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
+  // Daily change
+  const prevClose     = closes[n - 2] ?? currentPrice;
+  const change        = Math.round((currentPrice - prevClose) * 100) / 100;
+  const changePercent = Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
 
-  // 5-day look-back price (use earliest available if fewer than 5 bars back)
+  // 5-day momentum
   const price5dAgo = closes[Math.max(0, n - 6)];
+  const momentum   = Math.round(((currentPrice - price5dAgo) / price5dAgo) * 10000) / 10000;
 
-  // Volume metrics — average over last 20 bars
-  const recentBars = bars.slice(-20);
-  const currentVolume = bars[n - 1].volume;
+  // Volume
+  const recentBars   = bars.slice(-20);
+  const volume       = bars[n - 1].volume;
   const averageVolume = Math.round(
     recentBars.reduce((s, b) => s + b.volume, 0) / recentBars.length,
   );
+  const volumeRatio = Math.round((averageVolume > 0 ? volume / averageVolume : 1) * 10000) / 10000;
 
-  // Calibrated probability engine (sigmoid-based)
-  const { upProbability, downProbability, score, momentum, volumeRatio } =
-    computeProbability(
-      currentPrice,
-      ma20,
-      ma50,
-      rsi,
-      currentVolume,
-      averageVolume,
-      prevClose,
-      price5dAgo,
-    );
+  // Component scores
+  const trendScore    = computeTrendScore(currentPrice, ma20, ma50);
+  const momentumScore = Math.round(computeMomentumScore(currentPrice, price5dAgo) * 10000) / 10000;
+  const rsiScore      = computeRsiScore(rsi);
+  const volumeScore   = computeVolumeScore(volumeRatio, currentPrice, prevClose);
 
-  // Signal derived from probabilities (BUY ≥70%, SELL ≥70%, otherwise HOLD)
-  let signal: SignalType = "HOLD";
-  if (upProbability >= 70) signal = "BUY";
-  else if (downProbability >= 70) signal = "SELL";
+  // Final score & probabilities
+  const rawFinalScore = aggregateScore(trendScore, momentumScore, rsiScore, volumeScore);
+  const finalScore    = Math.round(rawFinalScore * 10000) / 10000;
+
+  const { upProbability, downProbability } = scoreToProb(rawFinalScore);
+
+  // Signal & confidence
+  const signal         = mapSignal(upProbability);
+  const confidenceTier = mapConfidenceTier(upProbability);
 
   return {
     ticker,
-    currentPrice: Math.round(currentPrice * 100) / 100,
-    ma20: Math.round(ma20 * 100) / 100,
-    ma50: Math.round(ma50 * 100) / 100,
+    currentPrice:   Math.round(currentPrice * 100) / 100,
+    prevClose:      Math.round(prevClose * 100) / 100,
+    ma20:           Math.round(ma20 * 100) / 100,
+    ma50:           Math.round(ma50 * 100) / 100,
     rsi,
+    price5dAgo:     Math.round(price5dAgo * 100) / 100,
     signal,
+    confidenceTier,
     change,
     changePercent,
-    lastUpdated: new Date().toISOString(),
+    lastUpdated:    new Date().toISOString(),
     upProbability,
     downProbability,
-    score,
+    finalScore,
+    trendScore,
+    momentumScore,
+    rsiScore,
+    volumeScore,
     momentum,
-    volume: currentVolume,
+    volume,
     averageVolume,
     volumeRatio,
     priceHistory,

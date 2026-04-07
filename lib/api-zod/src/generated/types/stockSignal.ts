@@ -6,14 +6,20 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SignalType } from "./signalType";
+import type { ConfidenceTier } from "./confidenceTier";
 
 export interface StockSignal {
   ticker: string;
   currentPrice: number;
+  /** Previous session closing price */
+  prevClose: number;
   ma20: number;
   ma50: number;
   rsi: number;
+  /** Closing price 5 trading days ago */
+  price5dAgo: number;
   signal: SignalType;
+  confidenceTier: ConfidenceTier;
   /** Price change from previous close */
   change: number;
   /** Percentage price change from previous close */
@@ -24,9 +30,17 @@ export interface StockSignal {
   upProbability: number;
   /** Probability score (0-100) that the stock moves down */
   downProbability: number;
-  /** Raw sigmoid input score from the weighted scoring model */
-  score: number;
-  /** 5-day price momentum as a decimal fraction */
+  /** Weighted final score in roughly [-1, +1] */
+  finalScore: number;
+  /** Trend component score in [-1, +1] */
+  trendScore: number;
+  /** Momentum component score in [-1, +1] */
+  momentumScore: number;
+  /** RSI component score */
+  rsiScore: number;
+  /** Volume confirmation score (-1, 0, or +1) */
+  volumeScore: number;
+  /** Raw 5-day price momentum as a decimal fraction */
   momentum: number;
   /** Most-recent bar volume */
   volume: number;

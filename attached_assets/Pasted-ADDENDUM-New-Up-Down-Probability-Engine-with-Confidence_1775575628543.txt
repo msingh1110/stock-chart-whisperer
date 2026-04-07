@@ -1,0 +1,210 @@
+ADDENDUM: New Up / Down Probability Engine with Confidence Tiers
+
+Replace the existing signal logic with a cleaner probability-based model that outputs:
+
+- Up probability
+- Down probability
+- Final signal: BUY / SELL / HOLD
+- Confidence tier: STRONG BUY / BUY / HOLD / SELL / STRONG SELL
+
+The goal is to make the model more intuitive, stable, and explainable by combining trend, momentum, RSI, and volume confirmation into a weighted score.
+
+Requirements:
+
+1. Indicators to compute
+For each ticker, compute:
+- current price
+- previous close
+- MA20
+- MA50
+- RSI (14)
+- price 5 trading days ago
+- current volume
+- average volume
+
+2. Component scoring model
+
+A. Trend score
+Use a trend score in the range [-1, +1].
+
+Rules:
+- Start at 0
+- Add +0.5 if price > MA20, else -0.5
+- Add +0.5 if MA20 > MA50, else -0.5
+
+This means:
+- +1 = strong uptrend
+- -1 = strong downtrend
+
+B. Momentum score
+Measure short-term momentum:
+
+- momentum_raw = (price - price_5d_ago) / price_5d_ago
+
+Convert to a bounded range [-1, +1]:
+- momentum_score = max(-1, min(1, momentum_raw * 5))
+
+C. RSI score
+Map RSI into a score in the range [-1, +1]:
+
+- If RSI < 40 → rsi_score = -1
+- If RSI >= 40 and RSI < 50 → rsi_score = -0.5
+- If RSI >= 50 and RSI <= 65 → rsi_score = +0.5
+- If RSI > 65 and RSI <= 75 → rsi_score = +0.2
+- If RSI > 75 → rsi_score = -0.5
+
+Rationale:
+- 50 to 65 is healthy bullish strength
+- above 75 may indicate overbought risk
+- below 40 is clearly bearish
+
+D. Volume confirmation score
+Use volume only as confirmation, not the main driver.
+
+- volume_ratio = current_volume / average_volume
+
+Rules:
+- If volume_ratio > 1.2 and price > previous_close → volume_score = +1
+- If volume_ratio > 1.2 and price < previous_close → volume_score = -1
+- Otherwise → volume_score = 0
+
+3. Weighted final score
+
+Compute final_score using:
+
+- 0.4 * trend_score
+- 0.3 * momentum_score
+- 0.2 * rsi_score
+- 0.1 * volume_score
+
+Formula:
+
+final_score = (
+  0.4 * trend_score +
+  0.3 * momentum_score +
+  0.2 * rsi_score +
+  0.1 * volume_score
+)
+
+The final_score should naturally stay roughly within [-1, +1].
+
+4. Convert final score to probabilities
+
+Use a simple stable normalization:
+
+- up_probability = (final_score + 1) / 2
+- down_probability = 1 - up_probability
+
+Requirements:
+- probabilities must always sum to 1
+- clamp values safely to [0, 1] if needed
+- return probabilities as decimals and percentages for frontend display if helpful
+
+5. Signal mapping
+
+Map probabilities into a final signal:
+
+- BUY if up_probability >= 0.65
+- SELL if down_probability >= 0.65
+- HOLD otherwise
+
+6. Confidence tiers
+
+Add a confidence label using these rules:
+
+- STRONG BUY if up_probability >= 0.80
+- BUY if up_probability >= 0.65 and < 0.80
+- STRONG SELL if down_probability >= 0.80
+- SELL if down_probability >= 0.65 and < 0.80
+- HOLD otherwise
+
+7. Backend output
+
+For each ticker, return:
+
+- ticker
+- company name if available
+- current price
+- previous close
+- MA20
+- MA50
+- RSI
+- price_5d_ago
+- current volume
+- average volume
+- volume_ratio
+- trend_score
+- momentum_score
+- rsi_score
+- volume_score
+- final_score
+- up_probability
+- down_probability
+- signal
+- confidence_tier
+
+Example output:
+
+{
+  "ticker": "NVDA",
+  "company": "NVIDIA Corporation",
+  "price": 123.45,
+  "previous_close": 121.90,
+  "ma20": 118.22,
+  "ma50": 110.11,
+  "rsi": 58.4,
+  "price_5d_ago": 119.10,
+  "current_volume": 42000000,
+  "average_volume": 31000000,
+  "volume_ratio": 1.35,
+  "trend_score": 1.0,
+  "momentum_score": 0.18,
+  "rsi_score": 0.5,
+  "volume_score": 1.0,
+  "final_score": 0.654,
+  "up_probability": 0.827,
+  "down_probability": 0.173,
+  "signal": "BUY",
+  "confidence_tier": "STRONG BUY"
+}
+
+8. Frontend updates
+
+For each ticker card or row, show:
+- Up probability
+- Down probability
+- Final signal
+- Confidence tier
+
+Recommended UI behavior:
+- Show Up probability in green
+- Show Down probability in red
+- Show confidence tier as a badge:
+  - STRONG BUY → bright green
+  - BUY → green
+  - HOLD → yellow / neutral
+  - SELL → red
+  - STRONG SELL → deep red
+
+Optional:
+- add a horizontal probability bar
+- show component scores in an expandable details section
+
+9. Code quality
+
+- Keep the logic modular
+- Separate:
+  - indicator calculation
+  - component scoring
+  - probability conversion
+  - signal / confidence mapping
+- Put weights and thresholds in a config section so they are easy to tune later
+- Use clear comments and deterministic logic
+
+10. Goal
+
+Make the signal engine feel more premium and reliable by using:
+- weighted component scoring
+- normalized up/down probabilities
+- clean BUY / SELL / HOLD outputs
+- confidence tiers that help users scan conviction quickly

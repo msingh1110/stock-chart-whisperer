@@ -121,6 +121,10 @@ components:
       type: string
       enum: [BUY, SELL, HOLD]
 
+    ConfidenceTier:
+      type: string
+      enum: [STRONG BUY, BUY, HOLD, SELL, STRONG SELL]
+
     StockSignal:
       type: object
       properties:
@@ -128,14 +132,22 @@ components:
           type: string
         currentPrice:
           type: number
+        prevClose:
+          type: number
+          description: Previous session closing price
         ma20:
           type: number
         ma50:
           type: number
         rsi:
           type: number
+        price5dAgo:
+          type: number
+          description: Closing price 5 trading days ago
         signal:
           $ref: "#/components/schemas/SignalType"
+        confidenceTier:
+          $ref: "#/components/schemas/ConfidenceTier"
         change:
           type: number
           description: Price change from previous close
@@ -151,12 +163,24 @@ components:
         downProbability:
           type: number
           description: Probability score (0-100) that the stock moves down
-        score:
+        finalScore:
           type: number
-          description: Raw sigmoid input score from the weighted scoring model
+          description: Weighted final score in roughly [-1, +1]
+        trendScore:
+          type: number
+          description: Trend component score in [-1, +1]
+        momentumScore:
+          type: number
+          description: Momentum component score in [-1, +1]
+        rsiScore:
+          type: number
+          description: RSI component score
+        volumeScore:
+          type: number
+          description: Volume confirmation score (-1, 0, or +1)
         momentum:
           type: number
-          description: 5-day price momentum as a decimal fraction
+          description: Raw 5-day price momentum as a decimal fraction
         volume:
           type: number
           description: Most-recent bar volume
@@ -172,16 +196,23 @@ components:
       required:
         - ticker
         - currentPrice
+        - prevClose
         - ma20
         - ma50
         - rsi
+        - price5dAgo
         - signal
+        - confidenceTier
         - change
         - changePercent
         - lastUpdated
         - upProbability
         - downProbability
-        - score
+        - finalScore
+        - trendScore
+        - momentumScore
+        - rsiScore
+        - volumeScore
         - momentum
         - volume
         - averageVolume
@@ -225,14 +256,22 @@ components:
           type: string
         currentPrice:
           type: number
+        prevClose:
+          type: number
+          description: Previous session closing price
         ma20:
           type: number
         ma50:
           type: number
         rsi:
           type: number
+        price5dAgo:
+          type: number
+          description: Closing price 5 trading days ago
         signal:
           $ref: "#/components/schemas/SignalType"
+        confidenceTier:
+          $ref: "#/components/schemas/ConfidenceTier"
         change:
           type: number
         changePercent:
@@ -245,12 +284,24 @@ components:
         downProbability:
           type: number
           description: Probability score (0-100) that the stock moves down
-        score:
+        finalScore:
           type: number
-          description: Raw sigmoid input score from the weighted scoring model
+          description: Weighted final score in roughly [-1, +1]
+        trendScore:
+          type: number
+          description: Trend component score in [-1, +1]
+        momentumScore:
+          type: number
+          description: Momentum component score in [-1, +1]
+        rsiScore:
+          type: number
+          description: RSI component score
+        volumeScore:
+          type: number
+          description: Volume confirmation score (-1, 0, or +1)
         momentum:
           type: number
-          description: 5-day price momentum as a decimal fraction
+          description: Raw 5-day price momentum as a decimal fraction
         volume:
           type: number
           description: Most-recent bar volume
@@ -270,16 +321,23 @@ components:
       required:
         - ticker
         - currentPrice
+        - prevClose
         - ma20
         - ma50
         - rsi
+        - price5dAgo
         - signal
+        - confidenceTier
         - change
         - changePercent
         - lastUpdated
         - upProbability
         - downProbability
-        - score
+        - finalScore
+        - trendScore
+        - momentumScore
+        - rsiScore
+        - volumeScore
         - momentum
         - volume
         - averageVolume

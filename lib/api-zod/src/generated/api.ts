@@ -15,37 +15,38 @@ export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
 
+const signalFields = {
+  ticker:          zod.string(),
+  currentPrice:    zod.number(),
+  prevClose:       zod.number().describe("Previous session closing price"),
+  ma20:            zod.number(),
+  ma50:            zod.number(),
+  rsi:             zod.number(),
+  price5dAgo:      zod.number().describe("Closing price 5 trading days ago"),
+  signal:          zod.enum(["BUY", "SELL", "HOLD"]),
+  confidenceTier:  zod.enum(["STRONG BUY", "BUY", "HOLD", "SELL", "STRONG SELL"]),
+  change:          zod.number().describe("Price change from previous close"),
+  changePercent:   zod.number().describe("Percentage price change from previous close"),
+  lastUpdated:     zod.string().describe("ISO timestamp of when data was last fetched"),
+  upProbability:   zod.number().describe("Probability score (0-100) that the stock moves up"),
+  downProbability: zod.number().describe("Probability score (0-100) that the stock moves down"),
+  finalScore:      zod.number().describe("Weighted final score in roughly [-1, +1]"),
+  trendScore:      zod.number().describe("Trend component score in [-1, +1]"),
+  momentumScore:   zod.number().describe("Momentum component score in [-1, +1]"),
+  rsiScore:        zod.number().describe("RSI component score"),
+  volumeScore:     zod.number().describe("Volume confirmation score (-1, 0, or +1)"),
+  momentum:        zod.number().describe("Raw 5-day price momentum as a decimal fraction"),
+  volume:          zod.number().describe("Most-recent bar volume"),
+  averageVolume:   zod.number().describe("Average daily volume over last 20 bars"),
+  volumeRatio:     zod.number().describe("current volume / average volume"),
+  company:         zod.string().describe("Full company name (empty string if unavailable)"),
+} as const;
+
 /**
- * Returns signals for NVDA, MSFT, AAPL, META, SOFI, HOOD
+ * Returns signals for the full default portfolio
  * @summary Get trading signals for all portfolio stocks
  */
-export const GetAllSignalsResponseItem = zod.object({
-  ticker: zod.string(),
-  currentPrice: zod.number(),
-  ma20: zod.number(),
-  ma50: zod.number(),
-  rsi: zod.number(),
-  signal: zod.enum(["BUY", "SELL", "HOLD"]),
-  change: zod.number().describe("Price change from previous close"),
-  changePercent: zod
-    .number()
-    .describe("Percentage price change from previous close"),
-  lastUpdated: zod
-    .string()
-    .describe("ISO timestamp of when data was last fetched"),
-  upProbability: zod
-    .number()
-    .describe("Probability score (0-100) that the stock moves up"),
-  downProbability: zod
-    .number()
-    .describe("Probability score (0-100) that the stock moves down"),
-  score: zod.number().describe("Raw sigmoid input score from the weighted scoring model"),
-  momentum: zod.number().describe("5-day price momentum as a decimal fraction"),
-  volume: zod.number().describe("Most-recent bar volume"),
-  averageVolume: zod.number().describe("Average daily volume over last 20 bars"),
-  volumeRatio: zod.number().describe("current volume / average volume"),
-  company: zod.string().describe("Full company name (empty string if unavailable)"),
-});
+export const GetAllSignalsResponseItem = zod.object(signalFields);
 export const GetAllSignalsResponse = zod.array(GetAllSignalsResponseItem);
 
 /**
@@ -56,37 +57,17 @@ export const GetSignalByTickerParams = zod.object({
 });
 
 export const GetSignalByTickerResponse = zod.object({
-  ticker: zod.string(),
-  currentPrice: zod.number(),
-  ma20: zod.number(),
-  ma50: zod.number(),
-  rsi: zod.number(),
-  signal: zod.enum(["BUY", "SELL", "HOLD"]),
-  change: zod.number(),
-  changePercent: zod.number(),
-  lastUpdated: zod.string(),
-  upProbability: zod
-    .number()
-    .describe("Probability score (0-100) that the stock moves up"),
-  downProbability: zod
-    .number()
-    .describe("Probability score (0-100) that the stock moves down"),
-  score: zod.number().describe("Raw sigmoid input score from the weighted scoring model"),
-  momentum: zod.number().describe("5-day price momentum as a decimal fraction"),
-  volume: zod.number().describe("Most-recent bar volume"),
-  averageVolume: zod.number().describe("Average daily volume over last 20 bars"),
-  volumeRatio: zod.number().describe("current volume / average volume"),
-  company: zod.string().describe("Full company name (empty string if unavailable)"),
+  ...signalFields,
   priceHistory: zod.array(
     zod.object({
-      date: zod.string().describe("Date in YYYY-MM-DD format"),
-      close: zod.number(),
-      open: zod.number(),
-      high: zod.number(),
-      low: zod.number(),
+      date:   zod.string().describe("Date in YYYY-MM-DD format"),
+      close:  zod.number(),
+      open:   zod.number(),
+      high:   zod.number(),
+      low:    zod.number(),
       volume: zod.number(),
-      ma20: zod.number().nullable(),
-      ma50: zod.number().nullable(),
+      ma20:   zod.number().nullable(),
+      ma50:   zod.number().nullable(),
     }),
   ),
 });
@@ -96,9 +77,9 @@ export const GetSignalByTickerResponse = zod.object({
  */
 export const GetPortfolioSummaryResponse = zod.object({
   totalStocks: zod.number(),
-  buyCount: zod.number(),
-  sellCount: zod.number(),
-  holdCount: zod.number(),
+  buyCount:    zod.number(),
+  sellCount:   zod.number(),
+  holdCount:   zod.number(),
   lastUpdated: zod.string(),
-  tickers: zod.array(zod.string()),
+  tickers:     zod.array(zod.string()),
 });

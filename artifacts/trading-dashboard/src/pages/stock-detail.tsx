@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 import { useGetSignalByTicker } from "@workspace/api-client-react";
-import { SignalBadge } from "@/components/signal-badge";
+import { SignalBadge, ConfidenceBadge } from "@/components/signal-badge";
 import { ProbabilityBar, getSignalNoteFromValues } from "@/components/stock-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,56 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
 const REFETCH_INTERVAL = 5 * 60 * 1000;
+
+function ScoreBar({
+  label,
+  score,
+  weight,
+  highlight = false,
+}: {
+  label: string;
+  score: number;
+  weight: number | null;
+  highlight?: boolean;
+}) {
+  const isPos = score >= 0;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between font-mono text-xs">
+        <div className="flex items-center gap-2">
+          <span className={cn("uppercase tracking-wider", highlight ? "text-foreground font-semibold" : "text-muted-foreground")}>
+            {label}
+          </span>
+          {weight !== null && (
+            <span className="text-[9px] text-muted-foreground/50">×{weight}</span>
+          )}
+        </div>
+        <span className={cn("font-semibold", isPos ? "text-green-400" : "text-red-400")}>
+          {score >= 0 ? "+" : ""}{score.toFixed(2)}
+        </span>
+      </div>
+      <div className={cn("w-full rounded-full overflow-hidden bg-muted/40 flex", highlight ? "h-2" : "h-1.5")}>
+        <div className="h-full bg-muted/60 flex-1 flex items-center justify-end">
+          {!isPos && (
+            <div
+              className="h-full bg-red-500/70 rounded-l-full"
+              style={{ width: `${Math.round((Math.abs(score) / 1) * 50)}%` }}
+            />
+          )}
+        </div>
+        <div className="h-full bg-muted/60 flex-1 flex items-center justify-start">
+          {isPos && (
+            <div
+              className={cn("h-full rounded-r-full", highlight ? "bg-emerald-400/80" : "bg-green-500/70")}
+              style={{ width: `${Math.round((score / 1) * 50)}%` }}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function StockDetail() {
   const { ticker } = useParams<{ ticker: string }>();
@@ -117,7 +167,10 @@ export default function StockDetail() {
                   </p>
                 )}
               </div>
-              <SignalBadge signal={stock.signal} size="lg" />
+              <div className="flex flex-col gap-2">
+                <SignalBadge signal={stock.signal} size="lg" />
+                <ConfidenceBadge tier={stock.confidenceTier} size="lg" />
+              </div>
             </div>
             
             <div className="flex items-baseline gap-3">
@@ -193,6 +246,35 @@ export default function StockDetail() {
           <p className="text-sm font-mono text-muted-foreground leading-relaxed">
             {getSignalNoteFromValues(stock.currentPrice, stock.ma20, stock.ma50, stock.rsi, stock.changePercent)}
           </p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/50 bg-card/30">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-mono text-sm uppercase tracking-widest text-muted-foreground">Signal Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <ScoreBar label="Trend"    score={stock.trendScore}    weight={0.4} />
+          <ScoreBar label="Momentum" score={stock.momentumScore} weight={0.3} />
+          <ScoreBar label="RSI"      score={stock.rsiScore}      weight={0.2} />
+          <ScoreBar label="Volume"   score={stock.volumeScore}   weight={0.1} />
+          <div className="border-t border-border/50 pt-3 mt-1">
+            <ScoreBar label="Final Score" score={stock.finalScore} weight={null} highlight />
+          </div>
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/50 font-mono text-xs text-muted-foreground">
+            <div>
+              <span className="uppercase tracking-wider text-[10px] block mb-1">5d Momentum</span>
+              <span className={cn("font-medium", stock.momentum >= 0 ? "text-green-400" : "text-red-400")}>
+                {stock.momentum >= 0 ? "+" : ""}{(stock.momentum * 100).toFixed(2)}%
+              </span>
+            </div>
+            <div>
+              <span className="uppercase tracking-wider text-[10px] block mb-1">Volume Ratio</span>
+              <span className={cn("font-medium", stock.volumeRatio >= 1.2 ? "text-yellow-400" : "text-foreground")}>
+                {stock.volumeRatio.toFixed(2)}×
+              </span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
