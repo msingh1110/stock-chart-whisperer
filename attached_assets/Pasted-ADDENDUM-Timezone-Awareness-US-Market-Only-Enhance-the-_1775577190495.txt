@@ -1,0 +1,104 @@
+ADDENDUM: Timezone Awareness (US Market Only)
+
+Enhance the dashboard to display both the user's current timezone and the US market timezone (New York), along with the last updated time.
+
+Goal:
+Help users clearly understand when the data was last refreshed and align it with US market time.
+
+---
+
+1. Backend requirements
+
+For each request, return:
+
+- current timestamp (UTC)
+- user timezone (auto-detected or passed from frontend)
+- exchange timezone (fixed to US market)
+
+Use:
+- exchange_timezone = "America/New_York"
+
+Return in API response:
+
+{
+  "last_updated_utc": "2026-04-07T15:29:49Z",
+  "user_timezone": "Asia/Singapore",
+  "exchange_timezone": "America/New_York"
+}
+
+---
+
+2. Time conversion logic
+
+- Convert UTC timestamp into:
+  - User local time
+  - US market time (New York)
+
+Use timezone-aware libraries:
+- Python: zoneinfo (preferred) or pytz
+- Ensure daylight savings (EST/EDT) is handled automatically
+
+---
+
+3. Frontend display
+
+Update the header section to show:
+
+- Last updated (user time)
+- US market time
+
+Example UI:
+
+[ clock icon ] LAST UPDATED: 23:29:49 (SGT)  
+[ globe icon ] MARKET TIME: 11:29:49 (NY)
+
+Optional:
+- Add refresh icon
+- Add tooltip: "Market time shown in New York (US Eastern Time)"
+
+---
+
+4. Frontend logic
+
+- Detect user timezone via browser:
+  Intl.DateTimeFormat().resolvedOptions().timeZone
+
+- Either:
+  A. Send to backend and receive converted times
+  OR
+  B. Convert UTC → local + NY time on frontend
+
+---
+
+5. Formatting
+
+- Use 24-hour format:
+  HH:MM:SS
+- Include timezone abbreviations:
+  - User → SGT, IST, etc.
+  - US market → EST / EDT (auto handled)
+
+---
+
+6. Optional enhancement (recommended)
+
+Show market status:
+
+- OPEN / CLOSED based on US market hours
+
+Example:
+"MARKET TIME: 11:29:49 (NY) • OPEN"
+
+---
+
+7. Code quality
+
+- Centralize timezone logic
+- Avoid hardcoding offsets
+- Always use timezone libraries (never manual offsets)
+- Keep formatting consistent
+
+---
+
+Goal:
+Make the dashboard feel professional and US-market aware by clearly showing both local user time and New York market time.

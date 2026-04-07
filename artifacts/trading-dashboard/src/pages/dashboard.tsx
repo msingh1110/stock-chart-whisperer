@@ -1,6 +1,6 @@
-import React, { useState, useRef, useCallback } from "react";
-import { format } from "date-fns";
-import { AlertCircle, ArrowRight, ChevronRight, Clock, RefreshCw, Search, X } from "lucide-react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import { AlertCircle, ArrowRight, ChevronRight, Clock, Globe, RefreshCw, Search, X } from "lucide-react";
+import { formatTime, tzAbbr, localTz, isMarketOpen, NY_TZ } from "@/lib/market-time";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetAllSignals,
@@ -38,8 +38,19 @@ function saveRecentSearches(searches: string[]) {
   } catch {}
 }
 
+function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
 export default function Dashboard() {
   const queryClient = useQueryClient();
+  const now = useNow();
+  const userTz = localTz();
 
   const {
     data: signals,
@@ -342,18 +353,47 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="flex items-center gap-3 text-muted-foreground font-mono text-sm uppercase tracking-wider">
-                <Clock className="h-4 w-4 text-primary" />
-                <span>Last Updated: {format(new Date(summary.lastUpdated), "HH:mm:ss")}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 ml-2 hover:bg-muted"
-                  onClick={handleRefresh}
-                  disabled={isSignalsLoading || isSummaryLoading}
-                >
-                  <RefreshCw className={cn("h-3 w-3", (isSignalsLoading || isSummaryLoading) && "animate-spin")} />
-                </Button>
+              <div className="flex flex-col gap-1.5 font-mono text-xs uppercase tracking-wider">
+                {/* Last-updated in user's local timezone */}
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span>Last Updated:</span>
+                  <span className="text-foreground">
+                    {formatTime(new Date(summary.lastUpdated), userTz)}
+                  </span>
+                  <span className="text-muted-foreground/50">
+                    ({tzAbbr(new Date(summary.lastUpdated), userTz)})
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 hover:bg-muted"
+                    onClick={handleRefresh}
+                    disabled={isSignalsLoading || isSummaryLoading}
+                  >
+                    <RefreshCw className={cn("h-3 w-3", (isSignalsLoading || isSummaryLoading) && "animate-spin")} />
+                  </Button>
+                </div>
+
+                {/* Live market time in New York + OPEN/CLOSED */}
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Globe className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span>Market Time:</span>
+                  <span className="text-foreground">
+                    {formatTime(now, NY_TZ)}
+                  </span>
+                  <span className="text-muted-foreground/50">
+                    ({tzAbbr(now, NY_TZ)})
+                  </span>
+                  <span className={cn(
+                    "text-[9px] px-2 py-0.5 rounded-full border font-semibold tracking-widest",
+                    isMarketOpen(now)
+                      ? "bg-green-500/10 text-green-400 border-green-500/30"
+                      : "bg-muted/40 text-muted-foreground/60 border-border/40"
+                  )}>
+                    {isMarketOpen(now) ? "● OPEN" : "○ CLOSED"}
+                  </span>
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-6">
