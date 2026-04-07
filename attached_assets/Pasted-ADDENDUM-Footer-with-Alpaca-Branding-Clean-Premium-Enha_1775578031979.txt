@@ -1,0 +1,114 @@
+ADDENDUM: Footer with Alpaca Branding (Clean + Premium)
+
+Enhance the footer to include Alpaca branding while improving spacing and visual polish.
+
+Goal:
+Create a subtle, professional footer that credits the creator and data source without clutter.
+
+---
+
+1. Content
+
+Display:
+
+"Built by Manmeet Singh • Powered by Alpaca"
+
+- "Manmeet Singh" → clickable (LinkedIn)
+- "Alpaca" → clickable (https://alpaca.markets)
+
+---
+
+2. Layout
+
+- Fixed bottom-right
+- Horizontal layout:
+  [text] • [text]
+
+- Include small Alpaca logo/icon next to "Powered by Alpaca"
+
+Structure:
+Built by Manmeet Singh • [Alpaca logo] Powered by Alpaca
+
+---
+
+3. Positioning (improved spacing)
+
+- bottom: 20px → bottom-5
+- right: 20px → right-5
+
+---
+
+4. Styling
+
+Container:
+- fixed bottom-5 right-5
+- px-3 py-1.5
+- text-xs
+- text-gray-400
+- rounded-full
+- backdrop-blur-sm
+- bg-gray-900/50
+
+Hover:
+- hover:text-gray-200
+- transition
+
+---
+
+5. Alpaca logo
+
+- Use small inline logo (SVG preferred)
+- Height: 12px–14px (h-3 or h-3.5)
+- Keep it monochrome or lightly colored to match dark UI
+
+Example:
+<img src="/alpaca-logo.svg" className="h-3 inline mx-1 opacity-80" />
+
+---
+
+6. Interaction
+
+- Open links in new tab:
+  - target="_blank"
+  - rel="noopener noreferrer"
+
+- Only underline links on hover
+
+---
+
+7. React component example
+
+function FooterSignature() {
+  return (
+    <div className="fixed bottom-5 right-5 px-3 py-1.5 text-xs text-gray-400 bg-gray-900/50 backdrop-blur-sm rounded-full hover:text-gray-200 transition flex items-center gap-1">
+      Built by{" "}
+      <a
+        href="https://www.linkedin.com/in/manmeetsingh11/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hover:underline"
+      >
+        Manmeet Singh
+      </a>
+      <span className="mx-1">•</span>
+      <img src="/alpaca-logo.svg" className="h-3 opacity-80" />
+      <a
+        href="https://alpaca.markets"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hover:underline ml-1"
+      >
+        Powered by Alpaca
+      </a>
+    </div>
+  );
+}
+
+---
+
+8. Goal
+
+Make the footer feel:
+- polished and intentional
+- credible (data source visible)
+- non-intrusive but premium
