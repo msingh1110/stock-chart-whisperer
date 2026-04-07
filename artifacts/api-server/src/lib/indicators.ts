@@ -170,20 +170,22 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
     }
   }
 
-  // Signal logic
-  let signal: SignalType = "HOLD";
-
-  if (ma20 > ma50 && currentPrice > ma20 && rsi >= 50 && rsi <= 70) {
-    signal = "BUY";
-  } else if (ma20 < ma50 && currentPrice < ma20 && rsi >= 30 && rsi <= 50) {
-    signal = "SELL";
-  }
-
-  // Change from previous close
+  // Change from previous close (needed for momentum scoring)
   const prevClose = closes[n - 2] ?? currentPrice;
   const change = Math.round((currentPrice - prevClose) * 100) / 100;
   const changePercent =
     Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
+
+  // Scored signal logic
+  let score = 0;
+  score += currentPrice > ma20 ? 1 : -1;
+  score += ma20 > ma50 ? 1 : -1;
+  score += rsi > 50 ? 1 : -1;
+  score += change > 0 ? 1 : -1;
+
+  let signal: SignalType = "HOLD";
+  if (score >= 2) signal = "BUY";
+  else if (score <= -2) signal = "SELL";
 
   // Probability model — use last 20 bars for average volume calculation
   const { upProbability, downProbability } = computeProbability(
