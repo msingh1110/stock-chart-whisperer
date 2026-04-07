@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
 import { format } from "date-fns";
-import { AlertCircle, ArrowRight, Clock, RefreshCw, Search, X } from "lucide-react";
+import { AlertCircle, ArrowRight, ChevronRight, Clock, RefreshCw, Search, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetAllSignals,
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { StockSignal } from "@workspace/api-client-react/src/generated/api.schemas";
-import { resolveTicker, type ResolveResult } from "@/lib/resolve-ticker";
+import { resolveTicker, type ResolveResult, type SearchSuggestion } from "@/lib/resolve-ticker";
 
 const REFETCH_INTERVAL = 5 * 60 * 1000;
 const MAX_RECENT = 5;
@@ -64,6 +64,8 @@ export default function Dashboard() {
   const [customLoading, setCustomLoading] = useState(false);
   const [customError, setCustomError] = useState<string | null>(null);
   const [resolvedInfo, setResolvedInfo] = useState<ResolveResult | null>(null);
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(loadRecentSearches);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -76,31 +78,21 @@ export default function Dashboard() {
     });
   }, []);
 
-  const handleAnalyze = useCallback(async (rawInput: string) => {
-    if (!rawInput.trim()) return;
-
-    // Step 1: resolve the raw input to a ticker
-    const result = resolveTicker(rawInput);
-    if (!result) {
-      setCustomError(`Could not find matching ticker for "${rawInput.trim()}"`);
-      setCustomSignal(null);
-      setResolvedInfo(null);
-      return;
-    }
-
-    const { ticker } = result;
+  /** Fetch signal data for a resolved ticker and show the result card. */
+  const fetchSignal = useCallback(async (
+    ticker: string,
+    resolveResult: ResolveResult | null,
+  ) => {
     setCustomLoading(true);
     setCustomError(null);
-    setResolvedInfo(null);
+    setSuggestions(null);
 
     try {
       const res = await fetch(`/api/signals/${ticker}`);
-      if (!res.ok) {
-        throw new Error("Ticker not found or data unavailable");
-      }
+      if (!res.ok) throw new Error("not found");
       const data: StockSignal = await res.json();
       setCustomSignal(data);
-      setResolvedInfo(result);
+      setResolvedInfo(resolveResult);
       addToRecent(ticker);
       setInput("");
     } catch {
@@ -110,6 +102,63 @@ export default function Dashboard() {
     }
   }, [addToRecent]);
 
+  const handleAnalyze = useCallback(async (rawInput: string) => {
+    if (!rawInput.trim()) return;
+
+    // Reset previous state
+    setSuggestions(null);
+    setCustomError(null);
+
+    // Step 1: try local resolution (instant)
+    const local = resolveTicker(rawInput);
+    if (local) {
+      await fetchSignal(local.ticker, local);
+      return;
+    }
+
+    // Step 2: input doesn't match locally — query the search API
+    setIsSearching(true);
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(rawInput.trim())}`);
+      const data = (await res.json()) as { results: SearchSuggestion[] };
+
+      if (!data.results || data.results.length === 0) {
+        setCustomError(`Could not resolve ticker for "${rawInput.trim()}"`);
+        return;
+      }
+
+      if (data.results.length === 1) {
+        // Single match — auto-select and analyze
+        const s = data.results[0];
+        const synth: ResolveResult = {
+          ticker: s.ticker,
+          wasMapped: true,
+          displayName: s.company,
+          matchType: s.matchType === "local" ? "exact" : "partial",
+        };
+        await fetchSignal(s.ticker, synth);
+      } else {
+        // Multiple matches — show suggestion list
+        setSuggestions(data.results);
+      }
+    } catch {
+      setCustomError("Search unavailable. Please enter the ticker symbol directly.");
+    } finally {
+      setIsSearching(false);
+    }
+  }, [fetchSignal]);
+
+  /** User clicked a suggestion — resolve and analyze immediately. */
+  const handleSelectSuggestion = useCallback(async (s: SearchSuggestion) => {
+    const synth: ResolveResult = {
+      ticker: s.ticker,
+      wasMapped: true,
+      displayName: s.company,
+      matchType: "exact",
+    };
+    await fetchSignal(s.ticker, synth);
+  }, [fetchSignal]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") handleAnalyze(input);
   };
@@ -118,6 +167,7 @@ export default function Dashboard() {
     setCustomSignal(null);
     setCustomError(null);
     setResolvedInfo(null);
+    setSuggestions(null);
     setInput("");
   };
 
@@ -156,10 +206,10 @@ export default function Dashboard() {
           </div>
           <Button
             onClick={() => handleAnalyze(input)}
-            disabled={customLoading || !input.trim()}
+            disabled={customLoading || isSearching || !input.trim()}
             className="font-mono uppercase tracking-wider shrink-0"
           >
-            {customLoading ? (
+            {customLoading || isSearching ? (
               <RefreshCw className="h-4 w-4 animate-spin" />
             ) : (
               "Analyze"
@@ -195,6 +245,51 @@ export default function Dashboard() {
         </Alert>
       )}
 
+      {/* ── Suggestions panel ── */}
+      {suggestions && suggestions.length > 0 && (
+        <div className="flex flex-col gap-2 border border-border/50 rounded-lg bg-card/50 p-4">
+          <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            {suggestions.length === 1 ? "Did you mean:" : `Top ${suggestions.length} matches — select one to analyze:`}
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {suggestions.map((s) => (
+              <button
+                key={s.ticker}
+                onClick={() => handleSelectSuggestion(s)}
+                disabled={customLoading}
+                className="flex items-center justify-between gap-4 px-3 py-2.5 rounded border border-border/40 bg-muted/20 hover:bg-muted/50 hover:border-border transition-all text-left group disabled:opacity-40"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="font-mono font-bold text-sm tracking-wider text-primary shrink-0">
+                    {s.ticker}
+                  </span>
+                  <span className="text-sm font-mono text-muted-foreground truncate">
+                    {s.company}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={cn(
+                    "text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded",
+                    s.matchType === "local"
+                      ? "bg-primary/10 text-primary border border-primary/20"
+                      : "bg-muted text-muted-foreground border border-border/40"
+                  )}>
+                    {s.matchType === "local" ? "local" : "web"}
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+                </div>
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setSuggestions(null)}
+            className="text-[10px] font-mono text-muted-foreground/40 hover:text-muted-foreground self-start mt-1 transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {(customLoading || customSignal) && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
@@ -205,7 +300,7 @@ export default function Dashboard() {
               {resolvedInfo?.wasMapped && resolvedInfo.displayName && (
                 <span className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary tracking-wider">
                   <ArrowRight className="h-3 w-3 shrink-0" />
-                  Mapped to: {resolvedInfo.ticker} ({resolvedInfo.displayName})
+                  Mapped to: {resolvedInfo.ticker} — {resolvedInfo.displayName}
                 </span>
               )}
             </div>
