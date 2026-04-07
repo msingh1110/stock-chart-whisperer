@@ -48,6 +48,8 @@ router.get("/signals", async (req, res): Promise<void> => {
     change: a.change,
     changePercent: a.changePercent,
     lastUpdated: a.lastUpdated,
+    upProbability: a.upProbability,
+    downProbability: a.downProbability,
   }));
   res.json(GetAllSignalsResponse.parse(payload));
 });

@@ -33,6 +33,12 @@ export const GetAllSignalsResponseItem = zod.object({
   lastUpdated: zod
     .string()
     .describe("ISO timestamp of when data was last fetched"),
+  upProbability: zod
+    .number()
+    .describe("Probability score (0-100) that the stock moves up"),
+  downProbability: zod
+    .number()
+    .describe("Probability score (0-100) that the stock moves down"),
 });
 export const GetAllSignalsResponse = zod.array(GetAllSignalsResponseItem);
 
@@ -53,6 +59,12 @@ export const GetSignalByTickerResponse = zod.object({
   change: zod.number(),
   changePercent: zod.number(),
   lastUpdated: zod.string(),
+  upProbability: zod
+    .number()
+    .describe("Probability score (0-100) that the stock moves up"),
+  downProbability: zod
+    .number()
+    .describe("Probability score (0-100) that the stock moves down"),
   priceHistory: zod.array(
     zod.object({
       date: zod.string().describe("Date in YYYY-MM-DD format"),

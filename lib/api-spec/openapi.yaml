@@ -145,6 +145,12 @@ components:
         lastUpdated:
           type: string
           description: ISO timestamp of when data was last fetched
+        upProbability:
+          type: number
+          description: Probability score (0-100) that the stock moves up
+        downProbability:
+          type: number
+          description: Probability score (0-100) that the stock moves down
       required:
         - ticker
         - currentPrice
@@ -155,6 +161,8 @@ components:
         - change
         - changePercent
         - lastUpdated
+        - upProbability
+        - downProbability
 
     PriceBar:
       type: object
@@ -207,6 +215,12 @@ components:
           type: number
         lastUpdated:
           type: string
+        upProbability:
+          type: number
+          description: Probability score (0-100) that the stock moves up
+        downProbability:
+          type: number
+          description: Probability score (0-100) that the stock moves down
         priceHistory:
           type: array
           items:
@@ -221,6 +235,8 @@ components:
         - change
         - changePercent
         - lastUpdated
+        - upProbability
+        - downProbability
         - priceHistory
 
     PortfolioSummary:

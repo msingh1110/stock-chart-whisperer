@@ -75,7 +75,55 @@ export interface StockAnalysis {
   change: number;
   changePercent: number;
   lastUpdated: string;
+  upProbability: number;
+  downProbability: number;
   priceHistory: PriceBarWithIndicators[];
+}
+
+/**
+ * Compute up/down probability using a weighted scoring model.
+ * Starts at 50/50 and shifts based on 5 positive and 5 negative conditions.
+ * Each condition is worth 10 points. Final score is clamped 0-100.
+ */
+export function computeProbability(
+  currentPrice: number,
+  ma20: number,
+  ma50: number,
+  rsi: number,
+  latestBar: DailyBar,
+  recentBars: DailyBar[],
+): { upProbability: number; downProbability: number } {
+  const WEIGHT = 10;
+  let score = 50;
+
+  // Average volume over recent bars
+  const avgVolume =
+    recentBars.reduce((sum, b) => sum + b.volume, 0) / recentBars.length;
+  const volumeAboveAvg = latestBar.volume > avgVolume;
+  const intradayUp = latestBar.close > latestBar.open;
+  const intradayDown = latestBar.close < latestBar.open;
+
+  // --- Positive conditions ---
+  if (currentPrice > ma20) score += WEIGHT;
+  if (ma20 > ma50) score += WEIGHT;
+  if (rsi >= 50 && rsi <= 65) score += WEIGHT;
+  if (intradayUp) score += WEIGHT;
+  if (volumeAboveAvg && intradayUp) score += WEIGHT;
+
+  // --- Negative conditions ---
+  if (currentPrice < ma20) score -= WEIGHT;
+  if (ma20 < ma50) score -= WEIGHT;
+  if (rsi < 45) score -= WEIGHT;
+  if (intradayDown) score -= WEIGHT;
+  if (volumeAboveAvg && intradayDown) score -= WEIGHT;
+
+  // Clamp 0–100
+  score = Math.max(0, Math.min(100, score));
+
+  return {
+    upProbability: score,
+    downProbability: 100 - score,
+  };
 }
 
 /**
@@ -146,6 +194,16 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
   const changePercent =
     Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
 
+  // Probability model — use last 20 bars for average volume calculation
+  const { upProbability, downProbability } = computeProbability(
+    currentPrice,
+    ma20,
+    ma50,
+    rsi,
+    bars[n - 1],
+    bars.slice(-20),
+  );
+
   return {
     ticker,
     currentPrice: Math.round(currentPrice * 100) / 100,
@@ -156,6 +214,8 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
     change,
     changePercent,
     lastUpdated: new Date().toISOString(),
+    upProbability,
+    downProbability,
     priceHistory,
   };
 }

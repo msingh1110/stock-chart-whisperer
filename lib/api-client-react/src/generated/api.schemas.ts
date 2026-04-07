@@ -34,6 +34,10 @@ export interface StockSignal {
   changePercent: number;
   /** ISO timestamp of when data was last fetched */
   lastUpdated: string;
+  /** Probability score (0-100) that the stock moves up */
+  upProbability: number;
+  /** Probability score (0-100) that the stock moves down */
+  downProbability: number;
 }
 
 export interface PriceBar {
@@ -60,6 +64,10 @@ export interface StockSignalDetail {
   change: number;
   changePercent: number;
   lastUpdated: string;
+  /** Probability score (0-100) that the stock moves up */
+  upProbability: number;
+  /** Probability score (0-100) that the stock moves down */
+  downProbability: number;
   priceHistory: PriceBar[];
 }
 
