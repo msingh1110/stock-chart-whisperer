@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
 import { format } from "date-fns";
-import { AlertCircle, Clock, RefreshCw, Search, X } from "lucide-react";
+import { AlertCircle, ArrowRight, Clock, RefreshCw, Search, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetAllSignals,
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { StockSignal } from "@workspace/api-client-react/src/generated/api.schemas";
+import { resolveTicker, type ResolveResult } from "@/lib/resolve-ticker";
 
 const REFETCH_INTERVAL = 5 * 60 * 1000;
 const MAX_RECENT = 5;
@@ -62,6 +63,7 @@ export default function Dashboard() {
   const [customSignal, setCustomSignal] = useState<StockSignal | null>(null);
   const [customLoading, setCustomLoading] = useState(false);
   const [customError, setCustomError] = useState<string | null>(null);
+  const [resolvedInfo, setResolvedInfo] = useState<ResolveResult | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>(loadRecentSearches);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -74,12 +76,22 @@ export default function Dashboard() {
     });
   }, []);
 
-  const handleAnalyze = useCallback(async (rawTicker: string) => {
-    const ticker = rawTicker.trim().toUpperCase();
-    if (!ticker) return;
+  const handleAnalyze = useCallback(async (rawInput: string) => {
+    if (!rawInput.trim()) return;
 
+    // Step 1: resolve the raw input to a ticker
+    const result = resolveTicker(rawInput);
+    if (!result) {
+      setCustomError(`Could not find matching ticker for "${rawInput.trim()}"`);
+      setCustomSignal(null);
+      setResolvedInfo(null);
+      return;
+    }
+
+    const { ticker } = result;
     setCustomLoading(true);
     setCustomError(null);
+    setResolvedInfo(null);
 
     try {
       const res = await fetch(`/api/signals/${ticker}`);
@@ -88,6 +100,7 @@ export default function Dashboard() {
       }
       const data: StockSignal = await res.json();
       setCustomSignal(data);
+      setResolvedInfo(result);
       addToRecent(ticker);
       setInput("");
     } catch {
@@ -104,6 +117,7 @@ export default function Dashboard() {
   const clearCustom = () => {
     setCustomSignal(null);
     setCustomError(null);
+    setResolvedInfo(null);
     setInput("");
   };
 
@@ -132,12 +146,12 @@ export default function Dashboard() {
             <Input
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value.toUpperCase())}
+              onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Analyze any ticker (e.g., TSLA)"
-              className="pl-9 font-mono uppercase tracking-wider bg-card/50 border-border/50 placeholder:normal-case placeholder:tracking-normal placeholder:font-normal focus-visible:ring-primary/50"
+              placeholder="Enter ticker or company name (e.g., AAPL or Apple)"
+              className="pl-9 font-mono bg-card/50 border-border/50 placeholder:tracking-normal placeholder:font-normal focus-visible:ring-primary/50"
               disabled={customLoading}
-              maxLength={10}
+              maxLength={40}
             />
           </div>
           <Button
@@ -184,9 +198,17 @@ export default function Dashboard() {
       {(customLoading || customSignal) && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              Custom Analysis
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                Custom Analysis
+              </span>
+              {resolvedInfo?.wasMapped && resolvedInfo.displayName && (
+                <span className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary tracking-wider">
+                  <ArrowRight className="h-3 w-3 shrink-0" />
+                  Mapped to: {resolvedInfo.ticker} ({resolvedInfo.displayName})
+                </span>
+              )}
+            </div>
             {customSignal && !customLoading && (
               <button
                 onClick={clearCustom}
