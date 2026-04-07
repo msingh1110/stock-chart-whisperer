@@ -1,0 +1,66 @@
+ADDENDUM: Robust Company Name → Ticker Resolution
+
+The current company-name mapping is too limited. Expand it so users can type real company names like “Lockheed Martin” and still get the correct ticker.
+
+Requirements:
+
+1. Input support
+- Users can type:
+  - Exact ticker (e.g., LMT)
+  - Full company name (e.g., Lockheed Martin)
+  - Common shortened name (e.g., Lockheed)
+- The app should resolve all of these to the correct ticker before analysis
+
+2. Default mapping upgrade
+- Expand the local company-to-ticker dictionary beyond the original portfolio
+- Include at least a starter universe of common US large-cap stocks and well-known names
+- Example entries:
+  - "LOCKHEED MARTIN" → "LMT"
+  - "LOCKHEED" → "LMT"
+  - "TESLA" → "TSLA"
+  - "AMAZON" → "AMZN"
+  - "ALPHABET" → "GOOGL"
+  - "GOOGLE" → "GOOGL"
+  - "NETFLIX" → "NFLX"
+  - "BERKSHIRE HATHAWAY" → "BRK.B"
+  - "JPMORGAN" → "JPM"
+  - "JOHNSON & JOHNSON" → "JNJ"
+
+3. Resolution logic
+Create a function:
+resolve_ticker(input: string) -> { ticker, company, match_type }
+
+Resolution flow:
+- Normalize input:
+  - trim whitespace
+  - uppercase
+  - remove punctuation where helpful
+- If exact ticker match exists, use it
+- Else if exact company-name match exists, use it
+- Else if partial company-name match exists, return the best match
+- Else call a reference-search source to look up the ticker dynamically
+
+4. Dynamic lookup for non-hardcoded names
+- Do not rely on Alpaca for company-name lookup
+- Use a secondary reference-data source for search:
+  - Preferred: Polygon ticker reference search
+  - Acceptable fallback: yfinance search or another stock reference API
+- Use this dynamic lookup when local mapping fails
+
+5. Suggestions UX
+- If there is no exact match, show suggestions like:
+  - “Did you mean: Lockheed Martin (LMT)?”
+- If multiple possible matches exist, show the top 3 suggestions and let the user select one
+
+6. Backend behavior
+- Only call the stock analysis endpoint after a ticker has been resolved successfully
+- Return a clean error if no ticker can be found:
+  - “Could not resolve ticker for ‘Lockheed Martin’”
+
+7. Frontend UX
+- After successful resolution, show:
+  - “Mapped to: LMT — Lockheed Martin Corporation”
+- Keep recent searches working with the resolved ticker and company name
+
+Goal:
+Make the ticker input feel natural and reliable, so users can type plain-English company names like “Lockheed Martin” and still get a correct stock analysis result.
