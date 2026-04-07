@@ -63,15 +63,23 @@ router.get("/signals/:ticker", async (req, res): Promise<void> => {
   }
 
   const ticker = params.data.ticker.toUpperCase();
-  if (!PORTFOLIO_TICKERS.includes(ticker)) {
-    res.status(404).json({ error: `Ticker ${ticker} not in portfolio` });
+
+  // Fetch and analyse any valid ticker (not restricted to the portfolio)
+  let bars: Awaited<ReturnType<typeof fetchDailyBars>>[string];
+  try {
+    const barsMap = await fetchDailyBars([ticker]);
+    bars = barsMap[ticker] ?? [];
+  } catch {
+    res.status(404).json({ error: `Ticker ${ticker} not found or data unavailable` });
     return;
   }
 
-  // Always fetch full detail for individual ticker requests
-  const barsMap = await fetchDailyBars([ticker]);
-  const analysis = analyzeStock(ticker, barsMap[ticker] ?? []);
+  if (!bars || bars.length === 0) {
+    res.status(404).json({ error: `No data available for ticker ${ticker}` });
+    return;
+  }
 
+  const analysis = analyzeStock(ticker, bars);
   res.json(GetSignalByTickerResponse.parse(analysis));
 });
 
