@@ -48,9 +48,9 @@ export function ConfidenceBadge({ tier, size = "md", className, ...props }: Conf
     <div
       className={cn(
         "inline-flex items-center justify-center font-mono font-semibold border uppercase tracking-wider",
-        size === "sm" && "text-[9px] px-1.5 py-0.5 rounded-sm",
-        size === "md" && "text-[10px] px-2 py-0.5 rounded-sm",
-        size === "lg" && "text-xs px-3 py-1 rounded",
+        size === "sm" && "text-[10px] px-2 py-0.5 rounded-sm",
+        size === "md" && "text-xs px-2.5 py-1 rounded-sm",
+        size === "lg" && "text-sm px-4 py-1.5 rounded",
         TIER_STYLES[tier] ?? TIER_STYLES["HOLD"],
         className
       )}
