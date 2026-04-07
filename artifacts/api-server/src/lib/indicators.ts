@@ -14,43 +14,40 @@ export function sma(closes: number[], i: number, period: number): number | null 
 }
 
 /**
- * Compute RSI using a simple rolling SMA on gains and losses.
+ * Compute RSI matching ta.momentum.RSIIndicator(close, window=14).rsi().
  *
- * Matches the canonical Python formula:
- *   delta    = prices.diff()
- *   gain     = delta.clip(lower=0)
- *   loss     = -delta.clip(upper=0)
- *   avg_gain = gain.rolling(window=period).mean()
- *   avg_loss = loss.rolling(window=period).mean()
- *   rs       = avg_gain / avg_loss
- *   rsi      = 100 - (100 / (1 + rs))
+ * The ta library uses pandas EWM with adjust=False and alpha=1/window:
+ *   up[i]    = max(0, close[i] - close[i-1])
+ *   dn[i]    = max(0, close[i-1] - close[i])
+ *   emaUp[i] = (1 - alpha) * emaUp[i-1] + alpha * up[i]   (seeded at index 1)
+ *   emaDn[i] = (1 - alpha) * emaDn[i-1] + alpha * dn[i]
+ *   RSI[i]   = 100 - 100 / (1 + emaUp[i] / emaDn[i])
  *
- * Returns an array of RSI values; null until enough data (period + 1 bars).
+ * Returns null until min_periods (= window) bars have been processed.
  */
 export function computeRSI(closes: number[], period = 14): (number | null)[] {
   const rsi: (number | null)[] = new Array(closes.length).fill(null);
   if (closes.length < period + 1) return rsi;
 
-  // Per-bar gain and loss (index 0 has no delta)
-  const gains = new Array(closes.length).fill(0);
-  const losses = new Array(closes.length).fill(0);
-  for (let i = 1; i < closes.length; i++) {
-    const delta = closes[i] - closes[i - 1];
-    gains[i] = Math.max(0, delta);
-    losses[i] = Math.max(0, -delta);
-  }
+  const alpha = 1 / period;
 
-  // Rolling SMA over `period` bars; first valid RSI at index `period`
-  for (let i = period; i < closes.length; i++) {
-    let sumGain = 0;
-    let sumLoss = 0;
-    for (let j = i - period + 1; j <= i; j++) {
-      sumGain += gains[j];
-      sumLoss += losses[j];
+  // Seed EWM with the very first delta (index 1), matching adjust=False behaviour
+  const firstDelta = closes[1] - closes[0];
+  let ewmUp = Math.max(0, firstDelta);
+  let ewmDn = Math.max(0, -firstDelta);
+
+  for (let i = 2; i < closes.length; i++) {
+    const delta = closes[i] - closes[i - 1];
+    const up = Math.max(0, delta);
+    const dn = Math.max(0, -delta);
+
+    ewmUp = (1 - alpha) * ewmUp + alpha * up;
+    ewmDn = (1 - alpha) * ewmDn + alpha * dn;
+
+    // Emit value only after min_periods bars (index >= period)
+    if (i >= period) {
+      rsi[i] = ewmDn === 0 ? 100 : 100 - 100 / (1 + ewmUp / ewmDn);
     }
-    const avgGain = sumGain / period;
-    const avgLoss = sumLoss / period;
-    rsi[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
   }
 
   return rsi;
