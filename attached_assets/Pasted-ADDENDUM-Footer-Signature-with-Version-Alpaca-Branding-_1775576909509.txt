@@ -1,0 +1,129 @@
+ADDENDUM: Footer Signature with Version + Alpaca Branding
+
+Enhance the footer signature to feel like a polished, production-grade product.
+
+---
+
+1. Content
+
+Display:
+
+"Built by Manmeet Singh • v1.0 • Powered by Alpaca"
+
+- "Manmeet Singh" → clickable (LinkedIn)
+- "Powered by Alpaca" → include Alpaca logo + optional link
+
+Links:
+- LinkedIn: https://www.linkedin.com/in/manmeetsingh11/
+- Alpaca: https://alpaca.markets/
+
+---
+
+2. Placement
+
+- Fixed bottom-right corner
+- Always visible across the app
+
+CSS:
+- position: fixed
+- bottom: 12px
+- right: 16px
+
+---
+
+3. Styling (clean + premium)
+
+- Subtle, non-intrusive
+- Tailwind example:
+
+text-xs text-gray-400 flex items-center gap-2 hover:text-gray-200 transition
+
+---
+
+4. Alpaca logo
+
+- Use a small inline logo (SVG or PNG)
+- Size:
+  - height: 12–14px
+  - keep it aligned with text baseline
+
+Example:
+- place logo before "Alpaca"
+- slightly muted opacity (e.g., opacity-70)
+
+---
+
+5. React component example
+
+function FooterSignature() {
+  return (
+    <div className="fixed bottom-3 right-4 text-xs text-gray-400 flex items-center gap-2 hover:text-gray-200 transition">
+      
+      <span>
+        Built by{" "}
+        <a
+          href="https://www.linkedin.com/in/manmeetsingh11/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline"
+        >
+          Manmeet Singh
+        </a>
+      </span>
+
+      <span>• v1.0 •</span>
+
+      <a
+        href="https://alpaca.markets/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1"
+      >
+        <img
+          src="/alpaca-logo.svg"
+          alt="Alpaca"
+          className="h-3 opacity-70"
+        />
+        <span>Alpaca</span>
+      </a>
+
+    </div>
+  );
+}
+
+---
+
+6. Assets
+
+- Add Alpaca logo to:
+  /public/alpaca-logo.svg
+
+- Use official logo (light version works best on dark UI)
+
+---
+
+7. Optional polish
+
+- Fade in on load
+- Slight hover glow on links
+- Reduce opacity when inactive
+
+---
+
+8. Mobile handling
+
+- Ensure it does not overlap UI
+- Option:
+  - reduce font size OR
+  - move slightly inward (right-3 bottom-2)
+
+---
+
+9. Goal
+
+Make the app feel like:
+- A real shipped product (v1.0)
+- Professionally branded
+- Clearly attributed
+
+Without distracting from the core trading dashboard.

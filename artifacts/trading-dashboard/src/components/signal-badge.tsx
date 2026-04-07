@@ -31,11 +31,11 @@ export function SignalBadge({ signal, size = "md", className, ...props }: Signal
 }
 
 const TIER_STYLES: Record<string, string> = {
-  "STRONG BUY":  "bg-emerald-400/10 text-emerald-400 border-emerald-400/30 shadow-[0_0_8px_rgba(52,211,153,0.15)]",
-  "BUY":         "bg-green-500/10 text-green-400 border-green-500/30",
-  "HOLD":        "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-  "SELL":        "bg-orange-500/10 text-orange-400 border-orange-500/30",
-  "STRONG SELL": "bg-red-600/10 text-red-400 border-red-600/30 shadow-[0_0_8px_rgba(220,38,38,0.15)]",
+  "STRONG BUY":  "bg-emerald-400/15 text-emerald-300 border-emerald-400/50 shadow-[0_0_12px_rgba(52,211,153,0.25)]",
+  "BUY":         "bg-green-500/10 text-green-400 border-green-500/40",
+  "HOLD":        "bg-yellow-500/10 text-yellow-400 border-yellow-500/40",
+  "SELL":        "bg-red-500/10 text-red-400 border-red-500/40",
+  "STRONG SELL": "bg-red-700/20 text-red-300 border-red-600/60 shadow-[0_0_12px_rgba(220,38,38,0.25)]",
 };
 
 interface ConfidenceBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -47,10 +47,10 @@ export function ConfidenceBadge({ tier, size = "md", className, ...props }: Conf
   return (
     <div
       className={cn(
-        "inline-flex items-center justify-center font-mono font-semibold border uppercase tracking-wider",
-        size === "sm" && "text-[10px] px-2 py-0.5 rounded-sm",
-        size === "md" && "text-xs px-2.5 py-1 rounded-sm",
-        size === "lg" && "text-sm px-4 py-1.5 rounded",
+        "inline-flex items-center justify-center font-mono font-semibold border uppercase tracking-wider rounded-full",
+        size === "sm" && "text-[10px] px-2.5 py-0.5",
+        size === "md" && "text-xs px-3 py-1",
+        size === "lg" && "text-sm px-4 py-1.5",
         TIER_STYLES[tier] ?? TIER_STYLES["HOLD"],
         className
       )}

@@ -1,6 +1,7 @@
 import React from "react";
 import { Activity } from "lucide-react";
 import { Link } from "wouter";
+import { FooterSignature } from "./footer-signature";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -25,6 +26,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 flex flex-col max-w-7xl mx-auto w-full p-4 md:p-6 lg:p-8">
         {children}
       </main>
+      <FooterSignature />
     </div>
   );
 }
