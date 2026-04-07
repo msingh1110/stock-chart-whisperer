@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SignalBadge } from "./signal-badge";
 import { cn } from "@/lib/utils";
 import type { StockSignal } from "@workspace/api-client-react/src/generated/api.schemas";
+import { getCompanyName } from "@/lib/company-names";
 
 export function getSignalNoteFromValues(
   currentPrice: number,
@@ -86,8 +87,15 @@ export function StockCard({ signal }: { signal: StockSignal }) {
         data-testid={`card-stock-${signal.ticker}`}
       >
         <CardContent className="p-5 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-mono text-xl font-bold tracking-tight">{signal.ticker}</h3>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="font-mono text-xl font-bold tracking-tight">{signal.ticker}</h3>
+              {getCompanyName(signal.ticker) && (
+                <p className="text-[10px] font-mono text-muted-foreground/60 tracking-wide leading-tight mt-0.5">
+                  {getCompanyName(signal.ticker)}
+                </p>
+              )}
+            </div>
             <SignalBadge signal={signal.signal} />
           </div>
 
