@@ -77,7 +77,7 @@ export function ProbabilityBar({ upProbability, downProbability, large = false }
 export function StockCard({ signal }: { signal: StockSignal }) {
   const isPositive = signal.change >= 0;
   const ChangeIcon = isPositive ? ArrowUpRight : ArrowDownRight;
-  const note = getSignalNoteFromValues(signal.currentPrice, signal.ma20, signal.ma50, signal.rsi, signal.changePercent);
+  const note = signal.explanation;
 
   return (
     <Link href={`/stock/${signal.ticker}`}>

@@ -71,6 +71,8 @@ export interface StockSignal {
   averageVolume: number;
   /** current volume / average volume */
   volumeRatio: number;
+  /** Human-readable signal explanation built from component scores */
+  explanation: string;
   /** Full company name (empty string if unavailable) */
   company: string;
 }
@@ -126,6 +128,8 @@ export interface StockSignalDetail {
   averageVolume: number;
   /** current volume / average volume */
   volumeRatio: number;
+  /** Human-readable signal explanation built from component scores */
+  explanation: string;
   /** Full company name (empty string if unavailable) */
   company: string;
   priceHistory: PriceBar[];

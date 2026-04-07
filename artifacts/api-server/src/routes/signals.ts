@@ -50,6 +50,7 @@ router.get("/signals", async (req, res): Promise<void> => {
       price5dAgo:     a.price5dAgo,
       signal:         a.signal,
       confidenceTier: a.confidenceTier,
+      explanation:    a.explanation,
       change:         a.change,
       changePercent:  a.changePercent,
       lastUpdated:    a.lastUpdated,

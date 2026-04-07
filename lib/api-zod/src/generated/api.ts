@@ -39,6 +39,7 @@ const signalFields = {
   volume:          zod.number().describe("Most-recent bar volume"),
   averageVolume:   zod.number().describe("Average daily volume over last 20 bars"),
   volumeRatio:     zod.number().describe("current volume / average volume"),
+  explanation:     zod.string().describe("Human-readable signal explanation built from component scores"),
   company:         zod.string().describe("Full company name (empty string if unavailable)"),
 } as const;
 

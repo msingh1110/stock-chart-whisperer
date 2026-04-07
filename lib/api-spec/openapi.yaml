@@ -190,6 +190,9 @@ components:
         volumeRatio:
           type: number
           description: current volume / average volume
+        explanation:
+          type: string
+          description: Human-readable signal explanation built from component scores
         company:
           type: string
           description: Full company name (empty string if unavailable)
@@ -203,6 +206,7 @@ components:
         - price5dAgo
         - signal
         - confidenceTier
+        - explanation
         - change
         - changePercent
         - lastUpdated
@@ -311,6 +315,9 @@ components:
         volumeRatio:
           type: number
           description: current volume / average volume
+        explanation:
+          type: string
+          description: Human-readable signal explanation built from component scores
         company:
           type: string
           description: Full company name (empty string if unavailable)
@@ -328,6 +335,7 @@ components:
         - price5dAgo
         - signal
         - confidenceTier
+        - explanation
         - change
         - changePercent
         - lastUpdated

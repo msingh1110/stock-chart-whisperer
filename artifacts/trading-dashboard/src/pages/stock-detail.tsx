@@ -15,7 +15,7 @@ import {
 
 import { useGetSignalByTicker } from "@workspace/api-client-react";
 import { ConfidenceBadge } from "@/components/signal-badge";
-import { ProbabilityBar, getSignalNoteFromValues } from "@/components/stock-card";
+import { ProbabilityBar } from "@/components/stock-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -241,7 +241,7 @@ export default function StockDetail() {
             large
           />
           <p className="text-sm font-mono text-muted-foreground leading-relaxed">
-            {getSignalNoteFromValues(stock.currentPrice, stock.ma20, stock.ma50, stock.rsi, stock.changePercent)}
+            {stock.explanation}
           </p>
         </CardContent>
       </Card>

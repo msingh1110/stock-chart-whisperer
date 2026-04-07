@@ -13,25 +13,23 @@ export function sma(closes: number[], i: number, period: number): number | null 
 }
 
 /**
- * RSI matching ta.momentum.RSIIndicator(close, window=14).rsi().
- * Uses pandas EWM with adjust=False and alpha=1/window.
+ * RSI using simple rolling mean of gains/losses over `period` bars.
+ * Matches the Python script: gain.rolling(period).mean() / loss.rolling(period).mean().
+ * First valid value emits at index `period`. NaN positions stay null (caller falls back to 50).
  */
 export function computeRSI(closes: number[], period = 14): (number | null)[] {
   const rsi: (number | null)[] = new Array(closes.length).fill(null);
-  if (closes.length < period + 1) return rsi;
-
-  const alpha = 1 / period;
-  const firstDelta = closes[1] - closes[0];
-  let ewmUp = Math.max(0, firstDelta);
-  let ewmDn = Math.max(0, -firstDelta);
-
-  for (let i = 2; i < closes.length; i++) {
-    const delta = closes[i] - closes[i - 1];
-    ewmUp = (1 - alpha) * ewmUp + alpha * Math.max(0, delta);
-    ewmDn = (1 - alpha) * ewmDn + alpha * Math.max(0, -delta);
-    if (i >= period) {
-      rsi[i] = ewmDn === 0 ? 100 : 100 - 100 / (1 + ewmUp / ewmDn);
+  for (let i = period; i < closes.length; i++) {
+    let sumGain = 0;
+    let sumLoss = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      const delta = closes[j] - closes[j - 1];
+      if (delta > 0) sumGain += delta;
+      else           sumLoss -= delta;
     }
+    const avgGain = sumGain / period;
+    const avgLoss = sumLoss / period;
+    rsi[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
   }
   return rsi;
 }
@@ -62,6 +60,7 @@ export interface StockAnalysis {
   price5dAgo: number;
   signal: SignalType;
   confidenceTier: ConfidenceTier;
+  explanation: string;
   change: number;
   changePercent: number;
   lastUpdated: string;
@@ -145,6 +144,42 @@ function computeVolumeScore(
   if (volumeRatio > 1.2 && price > prevClose) return 1;
   if (volumeRatio > 1.2 && price < prevClose) return -1;
   return 0;
+}
+
+// ── Explanation Builder (mirrors Python build_explanation) ─────────────────
+
+function buildExplanation(
+  trendScore: number,
+  momentumScore: number,
+  rsi: number,
+  volumeScore: number,
+  confidenceTier: ConfidenceTier,
+): string {
+  const parts: string[] = [];
+
+  if (trendScore >= 0.5)       parts.push("uptrend intact");
+  else if (trendScore <= -0.5) parts.push("downtrend intact");
+  else                         parts.push("trend mixed");
+
+  if (momentumScore >= 0.2)       parts.push("momentum improving");
+  else if (momentumScore <= -0.2) parts.push("momentum weakening");
+
+  if (rsi >= 50 && rsi <= 65)  parts.push(`RSI ${rsi.toFixed(1)} supports the move`);
+  else if (rsi < 40)           parts.push(`RSI ${rsi.toFixed(1)} is bearish`);
+  else if (rsi > 75)           parts.push(`RSI ${rsi.toFixed(1)} is overbought`);
+
+  if (volumeScore > 0) parts.push("volume confirms buying");
+  else if (volumeScore < 0) parts.push("volume confirms selling");
+
+  const prefix: Record<ConfidenceTier, string> = {
+    "STRONG BUY":  "High-conviction bullish setup",
+    "BUY":         "Bullish bias",
+    "HOLD":        "Mixed setup",
+    "SELL":        "Bearish bias",
+    "STRONG SELL": "High-conviction bearish setup",
+  };
+
+  return `${prefix[confidenceTier]}: ${parts.slice(0, 3).join(", ")}.`;
 }
 
 // ── Aggregation & Signal Mapping ───────────────────────────────────────────
@@ -263,6 +298,7 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
   // Signal & confidence
   const signal         = mapSignal(upProbability);
   const confidenceTier = mapConfidenceTier(upProbability);
+  const explanation    = buildExplanation(trendScore, momentumScore, rsi, volumeScore, confidenceTier);
 
   return {
     ticker,
@@ -274,6 +310,7 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
     price5dAgo:     Math.round(price5dAgo * 100) / 100,
     signal,
     confidenceTier,
+    explanation,
     change,
     changePercent,
     lastUpdated:    new Date().toISOString(),

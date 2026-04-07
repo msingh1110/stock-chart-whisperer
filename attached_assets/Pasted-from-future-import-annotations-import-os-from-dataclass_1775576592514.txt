@@ -1,0 +1,326 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Any, Optional
+
+import pandas as pd
+
+# pip install alpaca-py pandas
+from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.data.requests import StockBarsRequest, StockLatestBarRequest
+from alpaca.data.timeframe import TimeFrame
+
+
+@dataclass
+class SignalConfig:
+    ma_short: int = 20
+    ma_long: int = 50
+    rsi_period: int = 14
+    momentum_lookback: int = 5
+    avg_volume_window: int = 20
+
+    trend_weight: float = 0.4
+    momentum_weight: float = 0.3
+    rsi_weight: float = 0.2
+    volume_weight: float = 0.1
+
+    buy_threshold: float = 0.65
+    strong_buy_threshold: float = 0.80
+    sell_threshold: float = 0.65
+    strong_sell_threshold: float = 0.80
+
+
+def compute_rsi(close: pd.Series, period: int = 14) -> pd.Series:
+    delta = close.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+
+    avg_gain = gain.rolling(period).mean()
+    avg_loss = loss.rolling(period).mean()
+
+    rs = avg_gain / avg_loss.replace(0, pd.NA)
+    rsi = 100 - (100 / (1 + rs))
+    return rsi.fillna(50)
+
+
+def clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def build_explanation(
+    trend_score: float,
+    momentum_score: float,
+    rsi: float,
+    volume_score: float,
+    confidence_tier: str,
+) -> str:
+    parts = []
+
+    if trend_score >= 0.5:
+        parts.append("uptrend intact")
+    elif trend_score <= -0.5:
+        parts.append("downtrend intact")
+    else:
+        parts.append("trend mixed")
+
+    if momentum_score >= 0.2:
+        parts.append("momentum improving")
+    elif momentum_score <= -0.2:
+        parts.append("momentum weakening")
+
+    if 50 <= rsi <= 65:
+        parts.append(f"RSI {rsi:.1f} supports the move")
+    elif rsi < 40:
+        parts.append(f"RSI {rsi:.1f} is bearish")
+    elif rsi > 75:
+        parts.append(f"RSI {rsi:.1f} is overbought")
+
+    if volume_score > 0:
+        parts.append("volume confirms buying")
+    elif volume_score < 0:
+        parts.append("volume confirms selling")
+
+    prefix = {
+        "STRONG BUY": "High-conviction bullish setup",
+        "BUY": "Bullish bias",
+        "HOLD": "Mixed setup",
+        "SELL": "Bearish bias",
+        "STRONG SELL": "High-conviction bearish setup",
+    }.get(confidence_tier, "Mixed setup")
+
+    return f"{prefix}: " + ", ".join(parts[:3]) + "."
+
+
+def get_alpaca_client() -> StockHistoricalDataClient:
+    api_key = os.getenv("ALPACA_API_KEY")
+    api_secret = os.getenv("ALPACA_API_SECRET")
+
+    if not api_key or not api_secret:
+        raise ValueError(
+            "Missing ALPACA_API_KEY or ALPACA_API_SECRET environment variables."
+        )
+
+    return StockHistoricalDataClient(api_key, api_secret)
+
+
+def fetch_stock_data_from_alpaca(
+    symbol: str,
+    lookback_days: int = 120,
+    feed: str = "iex",
+) -> pd.DataFrame:
+    """
+    Fetch historical daily bars + latest bar from Alpaca and return a normalized DataFrame.
+
+    Returns columns:
+    - timestamp
+    - close
+    - volume
+    - ticker
+    """
+    client = get_alpaca_client()
+
+    end_dt = datetime.now(timezone.utc)
+    start_dt = end_dt - timedelta(days=lookback_days)
+
+    bars_request = StockBarsRequest(
+        symbol_or_symbols=symbol,
+        timeframe=TimeFrame.Day,
+        start=start_dt,
+        end=end_dt,
+        feed=feed,
+    )
+    bars = client.get_stock_bars(bars_request)
+
+    if symbol not in bars.data or not bars.data[symbol]:
+        raise ValueError(f"No historical bar data returned from Alpaca for {symbol}")
+
+    rows = []
+    for bar in bars.data[symbol]:
+        rows.append(
+            {
+                "timestamp": pd.Timestamp(bar.timestamp),
+                "close": float(bar.close),
+                "volume": float(bar.volume),
+                "ticker": symbol,
+            }
+        )
+
+    df = pd.DataFrame(rows).sort_values("timestamp").reset_index(drop=True)
+
+    # Optional: replace last close with latest bar close when available
+    try:
+        latest_request = StockLatestBarRequest(symbol_or_symbols=symbol, feed=feed)
+        latest = client.get_stock_latest_bar(latest_request)
+
+        if symbol in latest.data and latest.data[symbol]:
+            latest_bar = latest.data[symbol]
+            latest_ts = pd.Timestamp(latest_bar.timestamp)
+
+            # Update last row if same day, else append
+            if not df.empty and df.iloc[-1]["timestamp"].date() == latest_ts.date():
+                df.loc[df.index[-1], "close"] = float(latest_bar.close)
+                df.loc[df.index[-1], "volume"] = float(latest_bar.volume)
+                df.loc[df.index[-1], "timestamp"] = latest_ts
+            else:
+                df = pd.concat(
+                    [
+                        df,
+                        pd.DataFrame(
+                            [
+                                {
+                                    "timestamp": latest_ts,
+                                    "close": float(latest_bar.close),
+                                    "volume": float(latest_bar.volume),
+                                    "ticker": symbol,
+                                }
+                            ]
+                        ),
+                    ],
+                    ignore_index=True,
+                ).sort_values("timestamp").reset_index(drop=True)
+    except Exception:
+        # If latest bar call fails, historical bars are still enough to compute signals
+        pass
+
+    return df
+
+
+def calculate_signal_from_df(
+    df: pd.DataFrame,
+    company_name: Optional[str] = None,
+    config: Optional[SignalConfig] = None,
+) -> Dict[str, Any]:
+    config = config or SignalConfig()
+
+    required_cols = {"close", "volume"}
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {sorted(missing)}")
+
+    data = df.copy().reset_index(drop=True)
+
+    data["ma20"] = data["close"].rolling(config.ma_short).mean()
+    data["ma50"] = data["close"].rolling(config.ma_long).mean()
+    data["rsi"] = compute_rsi(data["close"], config.rsi_period)
+    data["avg_volume"] = data["volume"].rolling(config.avg_volume_window).mean()
+    data["prev_close"] = data["close"].shift(1)
+    data["price_5d_ago"] = data["close"].shift(config.momentum_lookback)
+
+    latest = data.iloc[-1]
+
+    price = float(latest["close"])
+    previous_close = float(latest["prev_close"]) if pd.notna(latest["prev_close"]) else price
+    ma20 = float(latest["ma20"]) if pd.notna(latest["ma20"]) else price
+    ma50 = float(latest["ma50"]) if pd.notna(latest["ma50"]) else price
+    rsi = float(latest["rsi"])
+    current_volume = float(latest["volume"])
+    average_volume = (
+        float(latest["avg_volume"])
+        if pd.notna(latest["avg_volume"]) and latest["avg_volume"]
+        else current_volume
+    )
+    price_5d_ago = float(latest["price_5d_ago"]) if pd.notna(latest["price_5d_ago"]) else price
+
+    # A. Trend score
+    trend_score = 0.0
+    trend_score += 0.5 if price > ma20 else -0.5
+    trend_score += 0.5 if ma20 > ma50 else -0.5
+
+    # B. Momentum score
+    momentum_raw = 0.0 if price_5d_ago == 0 else (price - price_5d_ago) / price_5d_ago
+    momentum_score = clamp(momentum_raw * 5, -1.0, 1.0)
+
+    # C. RSI score
+    if rsi < 40:
+        rsi_score = -1.0
+    elif rsi < 50:
+        rsi_score = -0.5
+    elif rsi <= 65:
+        rsi_score = 0.5
+    elif rsi <= 75:
+        rsi_score = 0.2
+    else:
+        rsi_score = -0.5
+
+    # D. Volume confirmation
+    volume_ratio = 0.0 if average_volume == 0 else current_volume / average_volume
+    if volume_ratio > 1.2 and price > previous_close:
+        volume_score = 1.0
+    elif volume_ratio > 1.2 and price < previous_close:
+        volume_score = -1.0
+    else:
+        volume_score = 0.0
+
+    final_score = (
+        config.trend_weight * trend_score
+        + config.momentum_weight * momentum_score
+        + config.rsi_weight * rsi_score
+        + config.volume_weight * volume_score
+    )
+    final_score = clamp(final_score, -1.0, 1.0)
+
+    up_probability = clamp((final_score + 1) / 2, 0.0, 1.0)
+    down_probability = 1 - up_probability
+
+    if up_probability >= config.strong_buy_threshold:
+        signal = "BUY"
+        confidence_tier = "STRONG BUY"
+    elif up_probability >= config.buy_threshold:
+        signal = "BUY"
+        confidence_tier = "BUY"
+    elif down_probability >= config.strong_sell_threshold:
+        signal = "SELL"
+        confidence_tier = "STRONG SELL"
+    elif down_probability >= config.sell_threshold:
+        signal = "SELL"
+        confidence_tier = "SELL"
+    else:
+        signal = "HOLD"
+        confidence_tier = "HOLD"
+
+    explanation = build_explanation(
+        trend_score=trend_score,
+        momentum_score=momentum_score,
+        rsi=rsi,
+        volume_score=volume_score,
+        confidence_tier=confidence_tier,
+    )
+
+    return {
+        "ticker": df["ticker"].iloc[-1] if "ticker" in df.columns else None,
+        "company": company_name,
+        "price": round(price, 2),
+        "previous_close": round(previous_close, 2),
+        "ma20": round(ma20, 2),
+        "ma50": round(ma50, 2),
+        "rsi": round(rsi, 2),
+        "price_5d_ago": round(price_5d_ago, 2),
+        "current_volume": int(current_volume),
+        "average_volume": round(average_volume, 2),
+        "volume_ratio": round(volume_ratio, 2),
+        "trend_score": round(trend_score, 3),
+        "momentum_score": round(momentum_score, 3),
+        "rsi_score": round(rsi_score, 3),
+        "volume_score": round(volume_score, 3),
+        "final_score": round(final_score, 3),
+        "up_probability": round(up_probability, 6),
+        "down_probability": round(down_probability, 6),
+        "up_probability_pct": round(up_probability * 100, 1),
+        "down_probability_pct": round(down_probability * 100, 1),
+        "signal": signal,
+        "confidence_tier": confidence_tier,
+        "explanation": explanation,
+    }
+
+
+def analyze_ticker_with_alpaca(symbol: str, company_name: Optional[str] = None) -> Dict[str, Any]:
+    df = fetch_stock_data_from_alpaca(symbol)
+    return calculate_signal_from_df(df, company_name=company_name)
+
+
+if __name__ == "__main__":
+    # Example
+    result = analyze_ticker_with_alpaca("NVDA", "NVIDIA Corporation")
+    print(result)
