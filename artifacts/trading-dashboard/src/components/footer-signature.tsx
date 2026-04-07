@@ -2,7 +2,7 @@ import React from "react";
 
 export function FooterSignature() {
   return (
-    <div className="fixed bottom-3 right-4 z-50 flex items-center gap-2 text-[11px] text-muted-foreground/50 font-mono select-none transition-opacity duration-300 hover:text-muted-foreground/80">
+    <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-3 py-1 text-xs text-gray-400 hover:text-gray-200 transition-colors duration-200 font-mono tracking-wide select-none bg-gray-900/60 backdrop-blur-sm rounded-full">
       <span>
         Built by{" "}
         <a
