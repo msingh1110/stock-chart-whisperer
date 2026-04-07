@@ -10,7 +10,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="container flex h-14 items-center max-w-7xl mx-auto px-4">
           <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
             <Activity className="h-5 w-5 text-primary" />
-            <span className="font-mono font-bold tracking-tight text-lg">Manny's Ticker</span>
+            <span className="font-mono font-bold tracking-tight text-lg">Manny's Terminal</span>
           </Link>
           <div className="ml-auto flex items-center space-x-4">
             <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
