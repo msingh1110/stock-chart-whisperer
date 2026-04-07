@@ -39,6 +39,11 @@ export const GetAllSignalsResponseItem = zod.object({
   downProbability: zod
     .number()
     .describe("Probability score (0-100) that the stock moves down"),
+  score: zod.number().describe("Raw sigmoid input score from the weighted scoring model"),
+  momentum: zod.number().describe("5-day price momentum as a decimal fraction"),
+  volume: zod.number().describe("Most-recent bar volume"),
+  averageVolume: zod.number().describe("Average daily volume over last 20 bars"),
+  volumeRatio: zod.number().describe("current volume / average volume"),
   company: zod.string().describe("Full company name (empty string if unavailable)"),
 });
 export const GetAllSignalsResponse = zod.array(GetAllSignalsResponseItem);
@@ -66,6 +71,11 @@ export const GetSignalByTickerResponse = zod.object({
   downProbability: zod
     .number()
     .describe("Probability score (0-100) that the stock moves down"),
+  score: zod.number().describe("Raw sigmoid input score from the weighted scoring model"),
+  momentum: zod.number().describe("5-day price momentum as a decimal fraction"),
+  volume: zod.number().describe("Most-recent bar volume"),
+  averageVolume: zod.number().describe("Average daily volume over last 20 bars"),
+  volumeRatio: zod.number().describe("current volume / average volume"),
   company: zod.string().describe("Full company name (empty string if unavailable)"),
   priceHistory: zod.array(
     zod.object({

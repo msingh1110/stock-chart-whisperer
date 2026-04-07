@@ -38,6 +38,16 @@ export interface StockSignal {
   upProbability: number;
   /** Probability score (0-100) that the stock moves down */
   downProbability: number;
+  /** Raw sigmoid input score from the weighted scoring model */
+  score: number;
+  /** 5-day price momentum as a decimal fraction */
+  momentum: number;
+  /** Most-recent bar volume */
+  volume: number;
+  /** Average daily volume over last 20 bars */
+  averageVolume: number;
+  /** current volume / average volume */
+  volumeRatio: number;
   /** Full company name (empty string if unavailable) */
   company: string;
 }
@@ -70,6 +80,16 @@ export interface StockSignalDetail {
   upProbability: number;
   /** Probability score (0-100) that the stock moves down */
   downProbability: number;
+  /** Raw sigmoid input score from the weighted scoring model */
+  score: number;
+  /** 5-day price momentum as a decimal fraction */
+  momentum: number;
+  /** Most-recent bar volume */
+  volume: number;
+  /** Average daily volume over last 20 bars */
+  averageVolume: number;
+  /** current volume / average volume */
+  volumeRatio: number;
   /** Full company name (empty string if unavailable) */
   company: string;
   priceHistory: PriceBar[];

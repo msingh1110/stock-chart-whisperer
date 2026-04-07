@@ -1,0 +1,121 @@
+ADDENDUM: Calibrated Probability-Based Signal Engine
+
+Upgrade the app’s signal logic from simple binary scoring to a more robust probability-based directional model that outputs:
+
+- Up probability
+- Down probability
+- Final signal (BUY / SELL / HOLD)
+
+This should feel stronger, more realistic, and less arbitrary than equal-weight rule counting.
+
+Requirements:
+
+1. Core scoring philosophy
+- Start from a neutral baseline
+- Use a continuous weighted score instead of simple +1 / -1 counting
+- Let stronger signals contribute more than weaker ones
+- Convert the final score into probabilities using a logistic / sigmoid function
+
+2. Indicators to use
+For each ticker, compute:
+- current price
+- MA20
+- MA50
+- RSI (14)
+- short-term momentum
+- current volume
+- average volume
+- previous close
+
+3. Weighted scoring logic
+
+Create a continuous `score` variable initialized to 0.
+
+A. Trend: price vs MA20
+- Compute:
+  - trend_short = (price - MA20) / MA20
+- Add weighted contribution:
+  - score += 2 * trend_short
+
+B. Trend: MA20 vs MA50
+- Compute:
+  - trend_long = (MA20 - MA50) / MA50
+- Add weighted contribution:
+  - score += 2 * trend_long
+
+C. RSI contribution
+- If RSI is between 50 and 65:
+  - add +1
+- If RSI > 70:
+  - add -1 because the stock may be overbought
+- If RSI < 45:
+  - add -1 because the trend is weak / bearish
+- Otherwise:
+  - add 0
+
+D. Momentum contribution
+- Compute short-term momentum as:
+  - momentum = (price - price_5d_ago) / price_5d_ago
+- Add weighted contribution:
+  - score += 1.5 * momentum
+
+E. Volume confirmation
+- Compute:
+  - volume_ratio = current_volume / average_volume
+- If price > previous_close:
+  - score += 1 * (volume_ratio - 1)
+- Else if price < previous_close:
+  - score -= 1 * (volume_ratio - 1)
+- Else:
+  - add 0
+
+4. Probability conversion
+After computing the final score, convert it into probabilities using a sigmoid / logistic function:
+
+- up_probability = 1 / (1 + exp(-score))
+- down_probability = 1 - up_probability
+
+This should ensure:
+- probabilities are smooth
+- probabilities sum to 1
+- stronger scores create stronger confidence
+
+5. Final signal mapping
+Map probabilities into signals:
+- BUY if up_probability >= 0.70
+- SELL if down_probability >= 0.70
+- HOLD otherwise
+
+6. Backend output
+For each ticker, return:
+- ticker
+- company name if available
+- price
+- MA20
+- MA50
+- RSI
+- momentum
+- volume
+- average volume
+- volume_ratio
+- score
+- up_probability
+- down_probability
+- signal
+
+Example shape:
+{
+  "ticker": "NVDA",
+  "price": 123.45,
+  "ma20": 118.22,
+  "ma50": 110.11,
+  "rsi": 58.4,
+  "momentum": 0.034,
+  "volume": 42000000,
+  "average_volume": 31000000,
+  "volume_ratio": 1.35,
+  "score": 1.42,
+  "up_probability": 0.81,
+  "down_probability": 0.19,
+  "signal": "BUY"
+}

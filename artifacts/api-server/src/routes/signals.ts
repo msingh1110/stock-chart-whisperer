@@ -52,6 +52,11 @@ router.get("/signals", async (req, res): Promise<void> => {
       lastUpdated: a.lastUpdated,
       upProbability: a.upProbability,
       downProbability: a.downProbability,
+      score: a.score,
+      momentum: a.momentum,
+      volume: a.volume,
+      averageVolume: a.averageVolume,
+      volumeRatio: a.volumeRatio,
       company: await getCompanyName(a.ticker),
     })),
   );

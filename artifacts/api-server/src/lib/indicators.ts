@@ -78,6 +78,16 @@ export interface StockAnalysis {
   lastUpdated: string;
   upProbability: number;
   downProbability: number;
+  /** Raw sigmoid input score */
+  score: number;
+  /** 5-day price momentum: (price - price5dAgo) / price5dAgo */
+  momentum: number;
+  /** Most-recent bar volume */
+  volume: number;
+  /** Average daily volume over last 20 bars */
+  averageVolume: number;
+  /** current volume / average volume */
+  volumeRatio: number;
   priceHistory: PriceBarWithIndicators[];
 }
 
@@ -140,6 +150,9 @@ export function computeProbability(
   const downProb = 1 - upProb;
 
   return {
+    score: Math.round(score * 10000) / 10000,
+    momentum: Math.round(momentum * 10000) / 10000,
+    volumeRatio: Math.round(volumeRatio * 10000) / 10000,
     upProbability: Math.round(upProb * 100),
     downProbability: Math.round(downProb * 100),
   };
@@ -189,32 +202,39 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
     }
   }
 
-  // Change from previous close (needed for momentum scoring)
+  // Previous close and 1-day change
   const prevClose = closes[n - 2] ?? currentPrice;
   const change = Math.round((currentPrice - prevClose) * 100) / 100;
   const changePercent =
     Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
 
-  // Scored signal logic
-  let score = 0;
-  score += currentPrice > ma20 ? 1 : -1;
-  score += ma20 > ma50 ? 1 : -1;
-  score += rsi > 50 ? 1 : -1;
-  score += change > 0 ? 1 : -1;
+  // 5-day look-back price (use earliest available if fewer than 5 bars back)
+  const price5dAgo = closes[Math.max(0, n - 6)];
 
-  let signal: SignalType = "HOLD";
-  if (score >= 2) signal = "BUY";
-  else if (score <= -2) signal = "SELL";
-
-  // Probability model — use last 20 bars for average volume calculation
-  const { upProbability, downProbability } = computeProbability(
-    currentPrice,
-    ma20,
-    ma50,
-    rsi,
-    bars[n - 1],
-    bars.slice(-20),
+  // Volume metrics — average over last 20 bars
+  const recentBars = bars.slice(-20);
+  const currentVolume = bars[n - 1].volume;
+  const averageVolume = Math.round(
+    recentBars.reduce((s, b) => s + b.volume, 0) / recentBars.length,
   );
+
+  // Calibrated probability engine (sigmoid-based)
+  const { upProbability, downProbability, score, momentum, volumeRatio } =
+    computeProbability(
+      currentPrice,
+      ma20,
+      ma50,
+      rsi,
+      currentVolume,
+      averageVolume,
+      prevClose,
+      price5dAgo,
+    );
+
+  // Signal derived from probabilities (BUY ≥70%, SELL ≥70%, otherwise HOLD)
+  let signal: SignalType = "HOLD";
+  if (upProbability >= 70) signal = "BUY";
+  else if (downProbability >= 70) signal = "SELL";
 
   return {
     ticker,
@@ -228,6 +248,11 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
     lastUpdated: new Date().toISOString(),
     upProbability,
     downProbability,
+    score,
+    momentum,
+    volume: currentVolume,
+    averageVolume,
+    volumeRatio,
     priceHistory,
   };
 }

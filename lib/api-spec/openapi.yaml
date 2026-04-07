@@ -151,6 +151,21 @@ components:
         downProbability:
           type: number
           description: Probability score (0-100) that the stock moves down
+        score:
+          type: number
+          description: Raw sigmoid input score from the weighted scoring model
+        momentum:
+          type: number
+          description: 5-day price momentum as a decimal fraction
+        volume:
+          type: number
+          description: Most-recent bar volume
+        averageVolume:
+          type: number
+          description: Average daily volume over last 20 bars
+        volumeRatio:
+          type: number
+          description: current volume / average volume
         company:
           type: string
           description: Full company name (empty string if unavailable)
@@ -166,6 +181,11 @@ components:
         - lastUpdated
         - upProbability
         - downProbability
+        - score
+        - momentum
+        - volume
+        - averageVolume
+        - volumeRatio
         - company
 
     PriceBar:
@@ -225,6 +245,21 @@ components:
         downProbability:
           type: number
           description: Probability score (0-100) that the stock moves down
+        score:
+          type: number
+          description: Raw sigmoid input score from the weighted scoring model
+        momentum:
+          type: number
+          description: 5-day price momentum as a decimal fraction
+        volume:
+          type: number
+          description: Most-recent bar volume
+        averageVolume:
+          type: number
+          description: Average daily volume over last 20 bars
+        volumeRatio:
+          type: number
+          description: current volume / average volume
         company:
           type: string
           description: Full company name (empty string if unavailable)
@@ -244,6 +279,11 @@ components:
         - lastUpdated
         - upProbability
         - downProbability
+        - score
+        - momentum
+        - volume
+        - averageVolume
+        - volumeRatio
         - company
         - priceHistory
 
