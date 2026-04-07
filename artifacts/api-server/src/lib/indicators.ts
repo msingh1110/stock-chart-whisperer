@@ -149,37 +149,106 @@ function computeVolumeScore(
 // ── Explanation Builder (mirrors Python build_explanation) ─────────────────
 
 function buildExplanation(
-  trendScore: number,
+  trendScore:    number,
   momentumScore: number,
-  rsi: number,
-  volumeScore: number,
+  rsi:           number,
+  volumeScore:   number,
   confidenceTier: ConfidenceTier,
+  price:  number,
+  ma20:   number,
+  ma50:   number,
 ): string {
-  const parts: string[] = [];
+  const aboveMa20     = price > ma20;
+  const aboveMa50     = price > ma50;
+  const ma20AboveMa50 = ma20  > ma50;
 
-  if (trendScore >= 0.5)       parts.push("uptrend intact");
-  else if (trendScore <= -0.5) parts.push("downtrend intact");
-  else                         parts.push("trend mixed");
+  const rsiN = Math.round(rsi);
 
-  if (momentumScore >= 0.2)       parts.push("momentum improving");
-  else if (momentumScore <= -0.2) parts.push("momentum weakening");
+  // RSI zone helpers
+  const rsiBullish    = rsi >= 50 && rsi <= 65;
+  const rsiBearish    = rsi < 40;
+  const rsiOverbought = rsi > 75;
+  const rsiWeak       = rsi >= 40 && rsi < 50;
 
-  if (rsi >= 50 && rsi <= 65)  parts.push(`RSI ${rsi.toFixed(1)} supports the move`);
-  else if (rsi < 40)           parts.push(`RSI ${rsi.toFixed(1)} is bearish`);
-  else if (rsi > 75)           parts.push(`RSI ${rsi.toFixed(1)} is overbought`);
+  // Momentum zone helpers
+  const mStrong = momentumScore >= 0.4;
+  const mMild   = momentumScore >= 0.1;
+  const mBear   = momentumScore <= -0.2;
 
-  if (volumeScore > 0) parts.push("volume confirms buying");
-  else if (volumeScore < 0) parts.push("volume confirms selling");
+  switch (confidenceTier) {
+    case "STRONG BUY": {
+      const maStr = aboveMa20 && aboveMa50
+        ? "well above MA20 and MA50"
+        : "above key moving averages";
+      const factors: string[] = [];
+      if (mStrong)          factors.push("strong upside momentum");
+      else if (mMild)       factors.push("improving momentum");
+      if (volumeScore > 0)  factors.push("above-average volume reinforcing bullish conviction");
+      else if (rsiBullish)  factors.push(`RSI at ${rsiN} in a healthy bullish range`);
+      const tail = factors.length ? `, with ${factors.slice(0, 2).join(" and ")}` : "";
+      return `Price is trading ${maStr}${tail}, signaling high-conviction bullish momentum.`;
+    }
 
-  const prefix: Record<ConfidenceTier, string> = {
-    "STRONG BUY":  "High-conviction bullish setup",
-    "BUY":         "Bullish bias",
-    "HOLD":        "Mixed setup",
-    "SELL":        "Bearish bias",
-    "STRONG SELL": "High-conviction bearish setup",
-  };
+    case "BUY": {
+      const maStr = aboveMa20 && aboveMa50
+        ? "above MA20 and MA50"
+        : aboveMa20
+          ? "above MA20"
+          : "near key moving averages";
+      const factors: string[] = [];
+      if (mStrong || mMild) factors.push("positive momentum");
+      if (rsiBullish)       factors.push(`RSI at ${rsiN} in a healthy range`);
+      if (volumeScore > 0)  factors.push("volume confirming buying interest");
+      const top = factors.slice(0, 2);
+      if (top.length === 0) return `Price is holding ${maStr}.`;
+      if (top.length === 1) return `Price is holding ${maStr}, with ${top[0]} supporting the upside.`;
+      return `Price is holding ${maStr}, while ${top.join(" and ")} favor upside.`;
+    }
 
-  return `${prefix[confidenceTier]}: ${parts.slice(0, 3).join(", ")}.`;
+    case "HOLD": {
+      const maStr        = aboveMa20 ? "above MA20" : "below MA20";
+      const maAlignNote  = ma20AboveMa50
+        ? "longer-term trend remains intact"
+        : "longer-term trend is under pressure";
+      const rsiNote = rsiBullish
+        ? `RSI at ${rsiN} is constructive but momentum lacks conviction`
+        : rsiBearish
+          ? `RSI at ${rsiN} reflects weakness without a clear reversal`
+          : rsiOverbought
+            ? `RSI at ${rsiN} is stretched, capping near-term upside`
+            : `RSI at ${rsiN} is neutral`;
+      return `Price is trading ${maStr} with no strong directional edge — ${rsiNote} and the ${maAlignNote}.`;
+    }
+
+    case "SELL": {
+      const maStr = !aboveMa20 && !aboveMa50
+        ? "below MA20 and MA50"
+        : !aboveMa20
+          ? "below MA20"
+          : "below key support";
+      const factors: string[] = [];
+      if (mBear)           factors.push("weakening momentum");
+      if (rsiBearish)      factors.push(`RSI at ${rsiN} in oversold territory`);
+      else if (rsiWeak)    factors.push(`soft RSI at ${rsiN}`);
+      if (volumeScore < 0) factors.push("elevated volume confirming distribution");
+      const top = factors.slice(0, 2);
+      if (top.length === 0) return `Price is trading ${maStr}, reinforcing a bearish setup.`;
+      if (top.length === 1) return `Price is trading ${maStr}, with ${top[0]} reinforcing the bearish setup.`;
+      return `Price is trading ${maStr}, with ${top.join(" and ")} reinforcing the bearish setup.`;
+    }
+
+    case "STRONG SELL": {
+      const maStr = !aboveMa20 && !aboveMa50
+        ? "below MA20 and MA50"
+        : "below key moving averages";
+      const factors: string[] = [];
+      if (mBear)           factors.push("negative momentum");
+      if (rsiBearish)      factors.push(`RSI at ${rsiN} in deeply oversold territory`);
+      if (volumeScore < 0) factors.push("heavy selling volume");
+      if (factors.length < 2) factors.push("deteriorating technicals across the board");
+      return `Price remains ${maStr}, while ${factors.slice(0, 2).join(" and ")} signal persistent selling pressure.`;
+    }
+  }
 }
 
 // ── Aggregation & Signal Mapping ───────────────────────────────────────────
@@ -298,7 +367,7 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
   // Signal & confidence
   const signal         = mapSignal(upProbability);
   const confidenceTier = mapConfidenceTier(upProbability);
-  const explanation    = buildExplanation(trendScore, momentumScore, rsi, volumeScore, confidenceTier);
+  const explanation    = buildExplanation(trendScore, momentumScore, rsi, volumeScore, confidenceTier, currentPrice, ma20, ma50);
 
   return {
     ticker,

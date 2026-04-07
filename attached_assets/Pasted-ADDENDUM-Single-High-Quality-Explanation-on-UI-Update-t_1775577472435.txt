@@ -1,0 +1,71 @@
+ADDENDUM: Single High-Quality Explanation on UI
+
+Update the explanation system so the UI shows only one explanation per ticker, and make that explanation detailed enough to be useful while still short enough to scan quickly.
+
+Goal:
+Show one strong, polished explanation on the UI that feels like a concise analyst insight, while still explicitly referring to RSI, momentum, moving averages, volume, and other core indicators where relevant.
+
+Requirements:
+
+1. One explanation field only
+- Return and display only one explanation string on the UI
+- Do not show both short_explanation and detailed_explanation
+- Use a single field called:
+  - explanation
+
+2. Explanation quality
+- The explanation should be:
+  - concise
+  - human-readable
+  - insight-driven
+  - decision-oriented
+- It should explain the main reason behind the signal, not just restate numbers
+- It may explicitly refer to:
+  - RSI
+  - momentum
+  - MA20 / MA50
+  - price vs moving averages
+  - volume / volume confirmation
+
+3. Length guidance
+- Target length: 1 to 2 sentences
+- Maximum length: about 20 to 40 words
+- It should be short enough to fit neatly inside a stock card or ticker detail section without cluttering the layout
+
+4. Explanation structure
+Build the explanation using the strongest relevant factors only:
+- trend via moving averages
+- momentum
+- RSI context
+- volume confirmation
+
+Recommended logic:
+- Always mention trend first when relevant
+- Then include the 1 or 2 strongest supporting factors
+- Reference indicator names naturally when helpful
+- Avoid forcing every indicator into every explanation
+
+5. Tone
+- Professional and polished
+- Similar to a trader or analyst note
+- Avoid robotic wording like:
+  - "Indicators suggest"
+  - "Based on the inputs"
+- Avoid just listing disconnected metrics
+
+6. Good examples
+
+BUY example:
+"Price is holding above MA20 and MA50, while positive momentum and RSI in a healthy range support further upside."
+
+STRONG BUY example:
+"Price is trading firmly above key moving averages, with strong momentum and above-average volume reinforcing bullish conviction."
+
+HOLD example:
+"Price action is mixed around key moving averages, while RSI and momentum show no strong directional edge."
+
+SELL example:
+"Price is trading below MA20 and MA50, with weakening momentum and soft RSI reinforcing a bearish setup."
+
+STRONG SELL example:
+"Price remains below key moving averages, while negative momentum and heavy selling 
