@@ -16,6 +16,8 @@ const HARDCODED: Record<string, string> = {
   HOOD: "Robinhood Markets Inc.",
   SHEL: "Shell plc",
   LMT:  "Lockheed Martin Corporation",
+  IAU:  "iShares Gold Trust",
+  SLV:  "iShares Silver Trust",
 };
 
 /**

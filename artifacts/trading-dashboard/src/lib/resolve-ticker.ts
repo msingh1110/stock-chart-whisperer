@@ -36,6 +36,13 @@ const COMPANY_MAP: Record<string, { ticker: string; displayName: string }> = {
   SOFI:      { ticker: "SOFI", displayName: "SoFi Technologies Inc." },
   ROBINHOOD: { ticker: "HOOD", displayName: "Robinhood Markets Inc." },
   SHELL:     { ticker: "SHEL", displayName: "Shell plc" },
+  IAU:       { ticker: "IAU",  displayName: "iShares Gold Trust" },
+  GOLD:      { ticker: "IAU",  displayName: "iShares Gold Trust" },
+  "GOLD ETF": { ticker: "IAU", displayName: "iShares Gold Trust" },
+  ISHARES:   { ticker: "IAU",  displayName: "iShares Gold Trust" },
+  SLV:       { ticker: "SLV",  displayName: "iShares Silver Trust" },
+  SILVER:    { ticker: "SLV",  displayName: "iShares Silver Trust" },
+  "SILVER ETF": { ticker: "SLV", displayName: "iShares Silver Trust" },
 
   // ── Mega-cap tech ──────────────────────────────────────────────────
   APPLE:             { ticker: "AAPL", displayName: "Apple Inc." },
