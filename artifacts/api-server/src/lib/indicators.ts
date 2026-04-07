@@ -14,39 +14,43 @@ export function sma(closes: number[], i: number, period: number): number | null 
 }
 
 /**
- * Compute RSI (Wilder's Smoothed Method) for all data points.
- * Returns array of RSI values (null until enough data).
+ * Compute RSI using a simple rolling SMA on gains and losses.
+ *
+ * Matches the canonical Python formula:
+ *   delta    = prices.diff()
+ *   gain     = delta.clip(lower=0)
+ *   loss     = -delta.clip(upper=0)
+ *   avg_gain = gain.rolling(window=period).mean()
+ *   avg_loss = loss.rolling(window=period).mean()
+ *   rs       = avg_gain / avg_loss
+ *   rsi      = 100 - (100 / (1 + rs))
+ *
+ * Returns an array of RSI values; null until enough data (period + 1 bars).
  */
 export function computeRSI(closes: number[], period = 14): (number | null)[] {
   const rsi: (number | null)[] = new Array(closes.length).fill(null);
   if (closes.length < period + 1) return rsi;
 
-  // First average gain/loss over first `period` periods
-  let avgGain = 0;
-  let avgLoss = 0;
-  for (let i = 1; i <= period; i++) {
-    const change = closes[i] - closes[i - 1];
-    if (change > 0) avgGain += change;
-    else avgLoss += Math.abs(change);
+  // Per-bar gain and loss (index 0 has no delta)
+  const gains = new Array(closes.length).fill(0);
+  const losses = new Array(closes.length).fill(0);
+  for (let i = 1; i < closes.length; i++) {
+    const delta = closes[i] - closes[i - 1];
+    gains[i] = Math.max(0, delta);
+    losses[i] = Math.max(0, -delta);
   }
-  avgGain /= period;
-  avgLoss /= period;
 
-  const calcRsi = (ag: number, al: number) =>
-    al === 0 ? 100 : 100 - 100 / (1 + ag / al);
-
-  rsi[period] = calcRsi(avgGain, avgLoss);
-
-  // Wilder smoothing for subsequent values
-  for (let i = period + 1; i < closes.length; i++) {
-    const change = closes[i] - closes[i - 1];
-    const gain = change > 0 ? change : 0;
-    const loss = change < 0 ? Math.abs(change) : 0;
-
-    avgGain = (avgGain * (period - 1) + gain) / period;
-    avgLoss = (avgLoss * (period - 1) + loss) / period;
-
-    rsi[i] = calcRsi(avgGain, avgLoss);
+  // Rolling SMA over `period` bars; first valid RSI at index `period`
+  for (let i = period; i < closes.length; i++) {
+    let sumGain = 0;
+    let sumLoss = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      sumGain += gains[j];
+      sumLoss += losses[j];
+    }
+    const avgGain = sumGain / period;
+    const avgLoss = sumLoss / period;
+    rsi[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
   }
 
   return rsi;
