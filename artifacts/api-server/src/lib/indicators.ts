@@ -170,22 +170,13 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
     }
   }
 
-  // Previous day MA values for cross detection
-  const prevMa20 = ma20Arr[n - 2];
-  const prevMa50 = ma50Arr[n - 2];
-
   // Signal logic
   let signal: SignalType = "HOLD";
 
-  if (prevMa20 !== null && prevMa50 !== null) {
-    const crossedAbove = prevMa20 <= prevMa50 && ma20 > ma50;
-    const crossedBelow = prevMa20 >= prevMa50 && ma20 < ma50;
-
-    if (crossedAbove && rsi < 70) {
-      signal = "BUY";
-    } else if (crossedBelow && rsi > 30) {
-      signal = "SELL";
-    }
+  if (ma20 > ma50 && currentPrice > ma20 && rsi >= 50 && rsi <= 70) {
+    signal = "BUY";
+  } else if (ma20 < ma50 && currentPrice < ma20 && rsi >= 30 && rsi <= 50) {
+    signal = "SELL";
   }
 
   // Change from previous close
