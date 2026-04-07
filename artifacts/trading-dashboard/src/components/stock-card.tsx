@@ -6,6 +6,37 @@ import { SignalBadge } from "./signal-badge";
 import { cn } from "@/lib/utils";
 import type { StockSignal } from "@workspace/api-client-react/src/generated/api.schemas";
 
+function getSignalNote(signal: StockSignal): string {
+  const parts: string[] = [];
+
+  // Price vs moving averages
+  const priceVsMa20 = signal.currentPrice > signal.ma20 ? "above MA20" : "below MA20";
+  const trendDir = signal.ma20 > signal.ma50 ? "uptrend" : "downtrend";
+  parts.push(`${priceVsMa20}, ${trendDir}`);
+
+  // RSI zone
+  if (signal.rsi >= 70) {
+    parts.push(`RSI overbought (${signal.rsi.toFixed(0)})`);
+  } else if (signal.rsi >= 50 && signal.rsi <= 65) {
+    parts.push(`RSI bullish zone (${signal.rsi.toFixed(0)})`);
+  } else if (signal.rsi < 30) {
+    parts.push(`RSI oversold (${signal.rsi.toFixed(0)})`);
+  } else if (signal.rsi < 45) {
+    parts.push(`RSI weak (${signal.rsi.toFixed(0)})`);
+  } else {
+    parts.push(`RSI neutral (${signal.rsi.toFixed(0)})`);
+  }
+
+  // Intraday move
+  if (signal.changePercent <= -2) {
+    parts.push("sharp selloff today");
+  } else if (signal.changePercent >= 2) {
+    parts.push("strong move up today");
+  }
+
+  return parts.join(" · ");
+}
+
 function ProbabilityBar({ upProbability, downProbability }: { upProbability: number; downProbability: number }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -34,6 +65,7 @@ function ProbabilityBar({ upProbability, downProbability }: { upProbability: num
 export function StockCard({ signal }: { signal: StockSignal }) {
   const isPositive = signal.change >= 0;
   const ChangeIcon = isPositive ? ArrowUpRight : ArrowDownRight;
+  const note = getSignalNote(signal);
 
   return (
     <Link href={`/stock/${signal.ticker}`}>
@@ -90,11 +122,17 @@ export function StockCard({ signal }: { signal: StockSignal }) {
             </div>
           </div>
 
-          <div className="pt-1 border-t border-border/50">
+          <div className="pt-1 border-t border-border/50 flex flex-col gap-2">
             <ProbabilityBar
               upProbability={signal.upProbability}
               downProbability={signal.downProbability}
             />
+            <p
+              className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed"
+              data-testid={`text-note-${signal.ticker}`}
+            >
+              {note}
+            </p>
           </div>
         </CardContent>
       </Card>
