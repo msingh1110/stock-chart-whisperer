@@ -7,34 +7,42 @@ import { cn } from "@/lib/utils";
 import type { StockSignal } from "@workspace/api-client-react/src/generated/api.schemas";
 
 function getSignalNote(signal: StockSignal): string {
-  const parts: string[] = [];
+  const aboveMa20 = signal.currentPrice > signal.ma20;
+  const uptrend = signal.ma20 > signal.ma50;
+  const rsi = signal.rsi;
 
-  // Price vs moving averages
-  const priceVsMa20 = signal.currentPrice > signal.ma20 ? "above MA20" : "below MA20";
-  const trendDir = signal.ma20 > signal.ma50 ? "uptrend" : "downtrend";
-  parts.push(`${priceVsMa20}, ${trendDir}`);
+  // Sentence 1 — price position and trend
+  const positionClause = aboveMa20
+    ? "Trading above the 20-day average"
+    : "Trading below the 20-day average";
+  const trendClause = uptrend
+    ? "within a short-term uptrend"
+    : "within a broader downtrend";
+  const sentence1 = `${positionClause} ${trendClause}.`;
 
-  // RSI zone
-  if (signal.rsi >= 70) {
-    parts.push(`RSI overbought (${signal.rsi.toFixed(0)})`);
-  } else if (signal.rsi >= 50 && signal.rsi <= 65) {
-    parts.push(`RSI bullish zone (${signal.rsi.toFixed(0)})`);
-  } else if (signal.rsi < 30) {
-    parts.push(`RSI oversold (${signal.rsi.toFixed(0)})`);
-  } else if (signal.rsi < 45) {
-    parts.push(`RSI weak (${signal.rsi.toFixed(0)})`);
+  // Sentence 2 — momentum (RSI)
+  let momentumPhrase: string;
+  if (rsi >= 70) {
+    momentumPhrase = `Momentum is overextended — RSI at ${rsi.toFixed(0)} signals overbought conditions.`;
+  } else if (rsi >= 50 && rsi <= 65) {
+    momentumPhrase = `Momentum is constructive with RSI at ${rsi.toFixed(0)}, supporting further upside.`;
+  } else if (rsi < 30) {
+    momentumPhrase = `RSI at ${rsi.toFixed(0)} is deeply oversold, suggesting potential for a near-term bounce.`;
+  } else if (rsi < 45) {
+    momentumPhrase = `Momentum is deteriorating — RSI at ${rsi.toFixed(0)} reflects selling pressure.`;
   } else {
-    parts.push(`RSI neutral (${signal.rsi.toFixed(0)})`);
+    momentumPhrase = `Momentum is neutral with RSI at ${rsi.toFixed(0)}, awaiting a directional catalyst.`;
   }
 
-  // Intraday move
+  // Optional sentence 3 — notable intraday move
+  let intradayNote = "";
   if (signal.changePercent <= -2) {
-    parts.push("sharp selloff today");
+    intradayNote = ` Notably, the stock is down ${Math.abs(signal.changePercent).toFixed(1)}% on an elevated intraday decline.`;
   } else if (signal.changePercent >= 2) {
-    parts.push("strong move up today");
+    intradayNote = ` The stock is up ${signal.changePercent.toFixed(1)}% today, indicating strong intraday demand.`;
   }
 
-  return parts.join(" · ");
+  return `${sentence1} ${momentumPhrase}${intradayNote}`;
 }
 
 function ProbabilityBar({ upProbability, downProbability }: { upProbability: number; downProbability: number }) {
