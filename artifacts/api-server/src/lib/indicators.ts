@@ -82,48 +82,66 @@ export interface StockAnalysis {
 }
 
 /**
- * Compute up/down probability using a weighted scoring model.
- * Starts at 50/50 and shifts based on 5 positive and 5 negative conditions.
- * Each condition is worth 10 points. Final score is clamped 0-100.
+ * Sigmoid / logistic function.
+ */
+function sigmoid(x: number): number {
+  return 1 / (1 + Math.exp(-x));
+}
+
+/**
+ * Calibrated probability-based signal engine.
+ *
+ * Builds a continuous weighted score from five factors:
+ *   A) Short-term trend  : 2 * (price - MA20) / MA20
+ *   B) Long-term trend   : 2 * (MA20 - MA50) / MA50
+ *   C) RSI contribution  : +1 (50–65), -1 (>70 or <45), 0 otherwise
+ *   D) 5-day momentum    : 1.5 * (price - price5dAgo) / price5dAgo
+ *   E) Volume confirm.   : ±1 * (volume_ratio - 1) depending on direction
+ *
+ * Converts score → probability via sigmoid:
+ *   upProbability   = sigmoid(score) * 100  (0–100)
+ *   downProbability = (1 - sigmoid(score)) * 100
  */
 export function computeProbability(
   currentPrice: number,
   ma20: number,
   ma50: number,
   rsi: number,
-  latestBar: DailyBar,
-  recentBars: DailyBar[],
+  currentVolume: number,
+  avgVolume: number,
+  prevClose: number,
+  price5dAgo: number,
 ): { upProbability: number; downProbability: number } {
-  const WEIGHT = 10;
-  let score = 50;
+  let score = 0;
 
-  // Average volume over recent bars
-  const avgVolume =
-    recentBars.reduce((sum, b) => sum + b.volume, 0) / recentBars.length;
-  const volumeAboveAvg = latestBar.volume > avgVolume;
-  const intradayUp = latestBar.close > latestBar.open;
-  const intradayDown = latestBar.close < latestBar.open;
+  // A. Short-term trend: price vs MA20
+  const trendShort = (currentPrice - ma20) / ma20;
+  score += 2 * trendShort;
 
-  // --- Positive conditions ---
-  if (currentPrice > ma20) score += WEIGHT;
-  if (ma20 > ma50) score += WEIGHT;
-  if (rsi >= 50 && rsi <= 65) score += WEIGHT;
-  if (intradayUp) score += WEIGHT;
-  if (volumeAboveAvg && intradayUp) score += WEIGHT;
+  // B. Long-term trend: MA20 vs MA50
+  const trendLong = (ma20 - ma50) / ma50;
+  score += 2 * trendLong;
 
-  // --- Negative conditions ---
-  if (currentPrice < ma20) score -= WEIGHT;
-  if (ma20 < ma50) score -= WEIGHT;
-  if (rsi < 45) score -= WEIGHT;
-  if (intradayDown) score -= WEIGHT;
-  if (volumeAboveAvg && intradayDown) score -= WEIGHT;
+  // C. RSI contribution
+  if (rsi >= 50 && rsi <= 65) score += 1;
+  else if (rsi > 70) score -= 1;
+  else if (rsi < 45) score -= 1;
 
-  // Clamp 0–100
-  score = Math.max(0, Math.min(100, score));
+  // D. 5-day momentum
+  const momentum = (currentPrice - price5dAgo) / price5dAgo;
+  score += 1.5 * momentum;
+
+  // E. Volume confirmation
+  const volumeRatio = avgVolume > 0 ? currentVolume / avgVolume : 1;
+  if (currentPrice > prevClose) score += 1 * (volumeRatio - 1);
+  else if (currentPrice < prevClose) score -= 1 * (volumeRatio - 1);
+
+  const upProb = sigmoid(score);
+  const downProb = 1 - upProb;
 
   return {
-    upProbability: score,
-    downProbability: 100 - score,
+    upProbability: Math.round(upProb * 100),
+    downProbability: Math.round(downProb * 100),
   };
 }
 
