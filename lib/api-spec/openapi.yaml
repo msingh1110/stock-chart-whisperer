@@ -3,13 +3,15 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Trading signals API powered by Alpaca Markets
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: signals
+    description: Trading signal operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,79 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /signals:
+    get:
+      operationId: getAllSignals
+      tags: [signals]
+      summary: Get trading signals for all portfolio stocks
+      description: Returns signals for NVDA, MSFT, AAPL, META, SOFI, HOOD
+      responses:
+        "200":
+          description: List of stock signals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockSignal"
+        "500":
+          description: Error fetching signals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /signals/{ticker}:
+    get:
+      operationId: getSignalByTicker
+      tags: [signals]
+      summary: Get signal and price history for a specific stock
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stock signal with full price history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockSignalDetail"
+        "404":
+          description: Ticker not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: Error fetching signal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /portfolio/summary:
+    get:
+      operationId: getPortfolioSummary
+      tags: [signals]
+      summary: Get a portfolio-level summary of all signals
+      responses:
+        "200":
+          description: Portfolio summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioSummary"
+        "500":
+          description: Error fetching summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +109,141 @@ components:
       required:
         - status
 
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SignalType:
+      type: string
+      enum: [BUY, SELL, HOLD]
+
+    StockSignal:
+      type: object
+      properties:
+        ticker:
+          type: string
+        currentPrice:
+          type: number
+        ma20:
+          type: number
+        ma50:
+          type: number
+        rsi:
+          type: number
+        signal:
+          $ref: "#/components/schemas/SignalType"
+        change:
+          type: number
+          description: Price change from previous close
+        changePercent:
+          type: number
+          description: Percentage price change from previous close
+        lastUpdated:
+          type: string
+          description: ISO timestamp of when data was last fetched
+      required:
+        - ticker
+        - currentPrice
+        - ma20
+        - ma50
+        - rsi
+        - signal
+        - change
+        - changePercent
+        - lastUpdated
+
+    PriceBar:
+      type: object
+      properties:
+        date:
+          type: string
+          description: Date in YYYY-MM-DD format
+        close:
+          type: number
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        volume:
+          type: number
+        ma20:
+          type: ["number", "null"]
+        ma50:
+          type: ["number", "null"]
+      required:
+        - date
+        - close
+        - open
+        - high
+        - low
+        - volume
+        - ma20
+        - ma50
+
+    StockSignalDetail:
+      type: object
+      properties:
+        ticker:
+          type: string
+        currentPrice:
+          type: number
+        ma20:
+          type: number
+        ma50:
+          type: number
+        rsi:
+          type: number
+        signal:
+          $ref: "#/components/schemas/SignalType"
+        change:
+          type: number
+        changePercent:
+          type: number
+        lastUpdated:
+          type: string
+        priceHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceBar"
+      required:
+        - ticker
+        - currentPrice
+        - ma20
+        - ma50
+        - rsi
+        - signal
+        - change
+        - changePercent
+        - lastUpdated
+        - priceHistory
+
+    PortfolioSummary:
+      type: object
+      properties:
+        totalStocks:
+          type: number
+        buyCount:
+          type: number
+        sellCount:
+          type: number
+        holdCount:
+          type: number
+        lastUpdated:
+          type: string
+        tickers:
+          type: array
+          items:
+            type: string
+      required:
+        - totalStocks
+        - buyCount
+        - sellCount
+        - holdCount
+        - lastUpdated
+        - tickers
