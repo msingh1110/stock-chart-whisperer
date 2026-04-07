@@ -39,6 +39,7 @@ export const GetAllSignalsResponseItem = zod.object({
   downProbability: zod
     .number()
     .describe("Probability score (0-100) that the stock moves down"),
+  company: zod.string().describe("Full company name (empty string if unavailable)"),
 });
 export const GetAllSignalsResponse = zod.array(GetAllSignalsResponseItem);
 
@@ -65,6 +66,7 @@ export const GetSignalByTickerResponse = zod.object({
   downProbability: zod
     .number()
     .describe("Probability score (0-100) that the stock moves down"),
+  company: zod.string().describe("Full company name (empty string if unavailable)"),
   priceHistory: zod.array(
     zod.object({
       date: zod.string().describe("Date in YYYY-MM-DD format"),

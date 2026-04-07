@@ -16,7 +16,6 @@ import {
 import { useGetSignalByTicker } from "@workspace/api-client-react";
 import { SignalBadge } from "@/components/signal-badge";
 import { ProbabilityBar, getSignalNoteFromValues } from "@/components/stock-card";
-import { getCompanyName } from "@/lib/company-names";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -112,9 +111,9 @@ export default function StockDetail() {
             <div className="flex items-center gap-4">
               <div>
                 <h1 className="text-4xl md:text-5xl font-bold font-mono tracking-tighter">{stock.ticker}</h1>
-                {getCompanyName(stock.ticker) && (
+                {stock.company && (
                   <p className="text-sm font-mono text-muted-foreground/60 tracking-wide mt-1">
-                    {getCompanyName(stock.ticker)}
+                    {stock.company}
                   </p>
                 )}
               </div>

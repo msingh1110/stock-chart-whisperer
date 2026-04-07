@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { fetchDailyBars } from "../lib/alpaca";
 import { analyzeStock } from "../lib/indicators";
+import { getCompanyName } from "../lib/company";
 import {
   GetAllSignalsResponse,
   GetSignalByTickerParams,
@@ -38,19 +39,22 @@ async function fetchAllSignals() {
 // GET /signals
 router.get("/signals", async (req, res): Promise<void> => {
   const analyses = await fetchAllSignals();
-  const payload = analyses.map((a) => ({
-    ticker: a.ticker,
-    currentPrice: a.currentPrice,
-    ma20: a.ma20,
-    ma50: a.ma50,
-    rsi: a.rsi,
-    signal: a.signal,
-    change: a.change,
-    changePercent: a.changePercent,
-    lastUpdated: a.lastUpdated,
-    upProbability: a.upProbability,
-    downProbability: a.downProbability,
-  }));
+  const payload = await Promise.all(
+    analyses.map(async (a) => ({
+      ticker: a.ticker,
+      currentPrice: a.currentPrice,
+      ma20: a.ma20,
+      ma50: a.ma50,
+      rsi: a.rsi,
+      signal: a.signal,
+      change: a.change,
+      changePercent: a.changePercent,
+      lastUpdated: a.lastUpdated,
+      upProbability: a.upProbability,
+      downProbability: a.downProbability,
+      company: await getCompanyName(a.ticker),
+    })),
+  );
   res.json(GetAllSignalsResponse.parse(payload));
 });
 
@@ -80,7 +84,8 @@ router.get("/signals/:ticker", async (req, res): Promise<void> => {
   }
 
   const analysis = analyzeStock(ticker, bars);
-  res.json(GetSignalByTickerResponse.parse(analysis));
+  const company = await getCompanyName(ticker);
+  res.json(GetSignalByTickerResponse.parse({ ...analysis, company }));
 });
 
 // GET /portfolio/summary

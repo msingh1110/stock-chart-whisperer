@@ -38,6 +38,8 @@ export interface StockSignal {
   upProbability: number;
   /** Probability score (0-100) that the stock moves down */
   downProbability: number;
+  /** Full company name (empty string if unavailable) */
+  company: string;
 }
 
 export interface PriceBar {
@@ -68,6 +70,8 @@ export interface StockSignalDetail {
   upProbability: number;
   /** Probability score (0-100) that the stock moves down */
   downProbability: number;
+  /** Full company name (empty string if unavailable) */
+  company: string;
   priceHistory: PriceBar[];
 }
 

@@ -151,6 +151,9 @@ components:
         downProbability:
           type: number
           description: Probability score (0-100) that the stock moves down
+        company:
+          type: string
+          description: Full company name (empty string if unavailable)
       required:
         - ticker
         - currentPrice
@@ -163,6 +166,7 @@ components:
         - lastUpdated
         - upProbability
         - downProbability
+        - company
 
     PriceBar:
       type: object
@@ -221,6 +225,9 @@ components:
         downProbability:
           type: number
           description: Probability score (0-100) that the stock moves down
+        company:
+          type: string
+          description: Full company name (empty string if unavailable)
         priceHistory:
           type: array
           items:
@@ -237,6 +244,7 @@ components:
         - lastUpdated
         - upProbability
         - downProbability
+        - company
         - priceHistory
 
     PortfolioSummary:
