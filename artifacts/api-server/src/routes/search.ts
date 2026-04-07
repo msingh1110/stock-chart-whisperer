@@ -26,6 +26,7 @@ function normalize(s: string): string {
 const COMPANY_MAP: Record<string, { ticker: string; displayName: string }> = {
   SOFI: { ticker: "SOFI", displayName: "SoFi Technologies Inc." },
   ROBINHOOD: { ticker: "HOOD", displayName: "Robinhood Markets Inc." },
+  SHELL: { ticker: "SHEL", displayName: "Shell plc" },
   APPLE: { ticker: "AAPL", displayName: "Apple Inc." },
   MICROSOFT: { ticker: "MSFT", displayName: "Microsoft Corporation" },
   NVIDIA: { ticker: "NVDA", displayName: "NVIDIA Corporation" },

@@ -11,7 +11,7 @@ import {
 
 const router: IRouter = Router();
 
-const PORTFOLIO_TICKERS = ["NVDA", "MSFT", "AAPL", "META", "SOFI", "HOOD"];
+const PORTFOLIO_TICKERS = ["NVDA", "MSFT", "AAPL", "META", "SOFI", "HOOD", "SHEL", "LMT"];
 
 // Simple in-memory cache — bust after 5 minutes
 interface CacheEntry<T> {

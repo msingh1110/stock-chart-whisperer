@@ -14,6 +14,8 @@ const HARDCODED: Record<string, string> = {
   META: "Meta Platforms Inc.",
   SOFI: "SoFi Technologies Inc.",
   HOOD: "Robinhood Markets Inc.",
+  SHEL: "Shell plc",
+  LMT:  "Lockheed Martin Corporation",
 };
 
 /**
