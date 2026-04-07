@@ -6,12 +6,16 @@ import { SignalBadge } from "./signal-badge";
 import { cn } from "@/lib/utils";
 import type { StockSignal } from "@workspace/api-client-react/src/generated/api.schemas";
 
-function getSignalNote(signal: StockSignal): string {
-  const aboveMa20 = signal.currentPrice > signal.ma20;
-  const uptrend = signal.ma20 > signal.ma50;
-  const rsi = signal.rsi;
+export function getSignalNoteFromValues(
+  currentPrice: number,
+  ma20: number,
+  ma50: number,
+  rsi: number,
+  changePercent: number,
+): string {
+  const aboveMa20 = currentPrice > ma20;
+  const uptrend = ma20 > ma50;
 
-  // Sentence 1 — price position and trend
   const positionClause = aboveMa20
     ? "Trading above the 20-day average"
     : "Trading below the 20-day average";
@@ -20,7 +24,6 @@ function getSignalNote(signal: StockSignal): string {
     : "within a broader downtrend";
   const sentence1 = `${positionClause} ${trendClause}.`;
 
-  // Sentence 2 — momentum (RSI)
   let momentumPhrase: string;
   if (rsi >= 70) {
     momentumPhrase = `Momentum is overextended — RSI at ${rsi.toFixed(0)} signals overbought conditions.`;
@@ -34,29 +37,30 @@ function getSignalNote(signal: StockSignal): string {
     momentumPhrase = `Momentum is neutral with RSI at ${rsi.toFixed(0)}, awaiting a directional catalyst.`;
   }
 
-  // Optional sentence 3 — notable intraday move
   let intradayNote = "";
-  if (signal.changePercent <= -2) {
-    intradayNote = ` Notably, the stock is down ${Math.abs(signal.changePercent).toFixed(1)}% on an elevated intraday decline.`;
-  } else if (signal.changePercent >= 2) {
-    intradayNote = ` The stock is up ${signal.changePercent.toFixed(1)}% today, indicating strong intraday demand.`;
+  if (changePercent <= -2) {
+    intradayNote = ` Notably, the stock is down ${Math.abs(changePercent).toFixed(1)}% on an elevated intraday decline.`;
+  } else if (changePercent >= 2) {
+    intradayNote = ` The stock is up ${changePercent.toFixed(1)}% today, indicating strong intraday demand.`;
   }
 
   return `${sentence1} ${momentumPhrase}${intradayNote}`;
 }
 
-function ProbabilityBar({ upProbability, downProbability }: { upProbability: number; downProbability: number }) {
+export function ProbabilityBar({ upProbability, downProbability, large = false }: { upProbability: number; downProbability: number; large?: boolean }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex justify-between items-center">
-        <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Up / Down Prob.</span>
-        <div className="flex items-center gap-2 font-mono text-[10px] font-semibold">
+        <span className={cn("font-mono uppercase tracking-wider text-muted-foreground", large ? "text-xs" : "text-[10px]")}>
+          Up / Down Probability
+        </span>
+        <div className={cn("flex items-center gap-2 font-mono font-semibold", large ? "text-sm" : "text-[10px]")}>
           <span className="text-green-400">{upProbability}%</span>
           <span className="text-muted-foreground">/</span>
           <span className="text-red-400">{downProbability}%</span>
         </div>
       </div>
-      <div className="h-1.5 w-full rounded-full overflow-hidden bg-muted/50 flex">
+      <div className={cn("w-full rounded-full overflow-hidden bg-muted/50 flex", large ? "h-2.5" : "h-1.5")}>
         <div
           className="h-full bg-green-500 transition-all duration-500"
           style={{ width: `${upProbability}%` }}
@@ -73,7 +77,7 @@ function ProbabilityBar({ upProbability, downProbability }: { upProbability: num
 export function StockCard({ signal }: { signal: StockSignal }) {
   const isPositive = signal.change >= 0;
   const ChangeIcon = isPositive ? ArrowUpRight : ArrowDownRight;
-  const note = getSignalNote(signal);
+  const note = getSignalNoteFromValues(signal.currentPrice, signal.ma20, signal.ma50, signal.rsi, signal.changePercent);
 
   return (
     <Link href={`/stock/${signal.ticker}`}>
