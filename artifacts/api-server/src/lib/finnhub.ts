@@ -38,6 +38,8 @@ interface FhArticle {
   headline: string;
   summary:  string;
   datetime: number;
+  source:   string;
+  url:      string;
 }
 
 interface FhSocialBucket {
@@ -230,6 +232,69 @@ export const NULL_ENRICHMENT: FinnhubEnrichment = {
     socialSentimentSummary: "neutral",
   },
 };
+
+// ── Fundamentals snapshot (ticker detail page only) ───────────────────────────
+
+export interface FundamentalsSnapshot {
+  marketCap:         number | null; // in millions USD
+  peRatio:           number | null;
+  eps:               number | null;
+  week52High:        number | null;
+  week52Low:         number | null;
+  beta:              number | null;
+  sharesOutstanding: number | null; // in millions
+}
+
+export async function fetchFundamentalsSnapshot(symbol: string): Promise<FundamentalsSnapshot | null> {
+  if (!process.env.FINNHUB_API_KEY) return null;
+  try {
+    const metrics = await fetchMetrics(symbol);
+    const snap: FundamentalsSnapshot = {
+      marketCap:         metrics["marketCapitalization"] ?? null,
+      peRatio:           metrics["peBasicExclExtraTTM"] ?? metrics["peNormalizedAnnual"] ?? null,
+      eps:               metrics["epsBasicExclExtraItemsTTM"] ?? null,
+      week52High:        metrics["52WeekHigh"] ?? null,
+      week52Low:         metrics["52WeekLow"]  ?? null,
+      beta:              metrics["beta"]        ?? null,
+      sharesOutstanding: metrics["shareOutstanding"] ?? null,
+    };
+    // Round each non-null field
+    for (const k of Object.keys(snap) as (keyof FundamentalsSnapshot)[]) {
+      if (snap[k] !== null) snap[k] = Math.round((snap[k] as number) * 100) / 100;
+    }
+    const hasAnyData = Object.values(snap).some((v) => v !== null);
+    return hasAnyData ? snap : null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Detailed news (ticker detail page only) ───────────────────────────────────
+
+export interface NewsArticle {
+  headline:    string;
+  source:      string;
+  publishedAt: string; // ISO string
+  url:         string;
+}
+
+export async function fetchDetailedNews(symbol: string, limit = 3): Promise<NewsArticle[]> {
+  if (!process.env.FINNHUB_API_KEY) return [];
+  try {
+    const articles = await fetchNews(symbol);
+    return articles
+      .slice(0, limit)
+      .map((a) => ({
+        headline:    a.headline,
+        source:      a.source ?? "",
+        publishedAt: new Date(a.datetime * 1000).toISOString(),
+        url:         a.url ?? "",
+      }))
+      .filter((a) => a.headline && a.url);
+  } catch {
+    return [];
+  }
+}
 
 export async function enrichWithFinnhub(symbol: string): Promise<FinnhubEnrichment> {
   if (!process.env.FINNHUB_API_KEY) return NULL_ENRICHMENT;

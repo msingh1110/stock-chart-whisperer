@@ -1,0 +1,131 @@
+ADDENDUM: Finnhub Enrichment Refinement
+
+Keep the main ticker page largely as-is, since the current layout already looks good. Only add a fundamentals snapshot and an optional news section there. Do not add anything new to the dashboard stock cards.
+
+Goal:
+Add high-value Finnhub context to the main ticker page only, without making the UI feel busy or changing the clean dashboard card layout.
+
+---
+
+1. Main ticker page: keep existing layout
+
+Do not redesign the main ticker page.
+Keep the current ticker detail layout, signal block, probabilities, charts, explanation, and existing market data as they are.
+
+Only add these two enhancements:
+
+A. Fundamentals snapshot
+Add a compact “Fundamentals Snapshot” section on the main ticker page with a small set of high-value fields from Finnhub.
+
+Include only the most useful fields that are available:
+- market cap
+- P/E ratio
+- EPS
+- 52-week high
+- 52-week low
+- beta
+- shares outstanding
+
+Rules:
+- Show only fields that are available
+- Keep the section compact and visually clean
+- Use a simple grid or two-column layout
+- Do not overload the page with too many financial metrics
+
+B. Optional news section
+Add a “Latest News” section on the main ticker page using Finnhub news.
+
+Include:
+- latest 3 headlines
+- source
+- published time
+- link to article
+
+Optional:
+- lightweight sentiment tag if already implemented
+- otherwise just show headlines cleanly
+
+Rules:
+- Keep this section below the main ticker content
+- Keep it compact and readable
+- Open news links in a new tab
+- If no news is available, hide the section gracefully
+
+---
+
+2. Stock cards
+
+Do not add any new Finnhub elements to the stock cards.
+Keep the stock cards exactly as they are today.
+
+Rules:
+- No fundamentals on cards
+- No news on cards
+- No daily change % added to cards
+- Preserve current spacing and clean scanability
+
+---
+
+3. Backend requirements
+
+Use Finnhub as a supplementary enrichment source only.
+
+For main ticker page response, add:
+- fundamentals_snapshot
+- latest_news
+
+Example shape:
+
+{
+  "ticker": "NVDA",
+  "signal_data": { ... },
+  "finnhub_data": {
+    "fundamentals_snapshot": {
+      "market_cap": 3000000000000,
+      "pe_ratio": 62.1,
+      "eps": 2.45,
+      "week_52_high": 140.5,
+      "week_52_low": 78.2,
+      "beta": 1.8,
+      "shares_outstanding": 24600000000
+    },
+    "latest_news": [
+      {
+        "headline": "NVIDIA extends AI chip rally...",
+        "source": "Reuters",
+        "published_at": "2026-04-07T14:10:00Z",
+        "url": "..."
+      }
+    ]
+  }
+}
+
+---
+
+4. Frontend requirements
+
+Main ticker page:
+- Add a compact “Fundamentals Snapshot” section
+- Add a compact “Latest News” section
+- Keep styling consistent with current UI
+
+Stock cards:
+- No changes
+- Keep current design and information density exactly as is
+
+---
+
+5. Error handling
+
+- Finnhub enrichment should be additive, not blocking
+- If fundamentals are unavailable, hide missing fields gracefully
+- If news is unavailable, hide the news section
+- Do not let Finnhub failures affect stock card rendering or the rest of the ticker page
+
+---
+
+6. Goal
+
+Keep the dashboard cards clean and unchanged, while making the main ticker page richer with:
+- one compact fundamentals snapshot
+- one optional latest news section

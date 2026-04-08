@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { fetchDailyBars } from "../lib/alpaca";
 import { analyzeStock } from "../lib/indicators";
-import { enrichWithFinnhub } from "../lib/finnhub";
+import { enrichWithFinnhub, fetchFundamentalsSnapshot, fetchDetailedNews } from "../lib/finnhub";
 import { getCompanyName } from "../lib/company";
 import {
   GetAllSignalsResponse,
@@ -104,10 +104,14 @@ router.get("/signals/:ticker", async (req, res): Promise<void> => {
     return;
   }
 
-  const enrichment = await enrichWithFinnhub(ticker);
-  const analysis   = analyzeStock(ticker, bars, enrichment);
-  const company    = await getCompanyName(ticker);
-  res.json(GetSignalByTickerResponse.parse({ ...analysis, company }));
+  const [enrichment, fundamentalsSnapshot, latestNews, company] = await Promise.all([
+    enrichWithFinnhub(ticker),
+    fetchFundamentalsSnapshot(ticker),
+    fetchDetailedNews(ticker, 3),
+    getCompanyName(ticker),
+  ]);
+  const analysis = analyzeStock(ticker, bars, enrichment);
+  res.json(GetSignalByTickerResponse.parse({ ...analysis, company, fundamentalsSnapshot, latestNews }));
 });
 
 // GET /portfolio/summary

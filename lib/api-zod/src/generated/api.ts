@@ -68,8 +68,27 @@ export const GetSignalByTickerParams = zod.object({
   ticker: zod.coerce.string(),
 });
 
+const FundamentalsSnapshotSchema = zod.object({
+  marketCap:         zod.number().nullable(),
+  peRatio:           zod.number().nullable(),
+  eps:               zod.number().nullable(),
+  week52High:        zod.number().nullable(),
+  week52Low:         zod.number().nullable(),
+  beta:              zod.number().nullable(),
+  sharesOutstanding: zod.number().nullable(),
+}).nullable();
+
+const NewsArticleSchema = zod.object({
+  headline:    zod.string(),
+  source:      zod.string(),
+  publishedAt: zod.string(),
+  url:         zod.string(),
+});
+
 export const GetSignalByTickerResponse = zod.object({
   ...signalFields,
+  fundamentalsSnapshot: FundamentalsSnapshotSchema.optional(),
+  latestNews:           zod.array(NewsArticleSchema).optional(),
   priceHistory: zod.array(
     zod.object({
       date:   zod.string().describe("Date in YYYY-MM-DD format"),

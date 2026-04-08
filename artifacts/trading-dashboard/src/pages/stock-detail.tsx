@@ -1,6 +1,6 @@
 import React from "react";
 import { useParams, Link } from "wouter";
-import { ArrowLeft, AlertCircle, ArrowUpRight, ArrowDownRight, Clock } from "lucide-react";
+import { ArrowLeft, AlertCircle, ArrowUpRight, ArrowDownRight, Clock, ExternalLink, Newspaper } from "lucide-react";
 import { format } from "date-fns";
 import { 
   ResponsiveContainer, 
@@ -22,6 +22,26 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
 const REFETCH_INTERVAL = 5 * 60 * 1000;
+
+function fmtMarketCap(millions: number): string {
+  if (millions >= 1_000_000) return `$${(millions / 1_000_000).toFixed(2)}T`;
+  if (millions >= 1_000)     return `$${(millions / 1_000).toFixed(2)}B`;
+  return `$${millions.toFixed(0)}M`;
+}
+
+function fmtShares(millions: number): string {
+  if (millions >= 1_000) return `${(millions / 1_000).toFixed(2)}B`;
+  return `${millions.toFixed(0)}M`;
+}
+
+function fmtNewsTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const h = Math.floor(diff / 3_600_000);
+  if (h < 1)  return "< 1h ago";
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
 
 function ScoreBar({
   label,
@@ -251,10 +271,13 @@ export default function StockDetail() {
           <CardTitle className="font-mono text-sm uppercase tracking-widest text-muted-foreground">Signal Breakdown</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <ScoreBar label="Trend"    score={stock.trendScore}    weight={0.4} />
-          <ScoreBar label="Momentum" score={stock.momentumScore} weight={0.3} />
-          <ScoreBar label="RSI"      score={stock.rsiScore}      weight={0.2} />
-          <ScoreBar label="Volume"   score={stock.volumeScore}   weight={0.1} />
+          <ScoreBar label="Trend"        score={stock.trendScore}        weight={0.35} />
+          <ScoreBar label="Momentum"     score={stock.momentumScore}     weight={0.25} />
+          <ScoreBar label="RSI"          score={stock.rsiScore}          weight={0.15} />
+          <ScoreBar label="Volume"       score={stock.volumeScore}       weight={0.10} />
+          <ScoreBar label="News"         score={stock.newsScore}         weight={0.10} />
+          <ScoreBar label="Social"       score={stock.socialScore}       weight={0.03} />
+          <ScoreBar label="Fundamentals" score={stock.fundamentalsScore} weight={0.02} />
           <div className="border-t border-border/50 pt-3 mt-1">
             <ScoreBar label="Final Score" score={stock.finalScore} weight={null} highlight />
           </div>
@@ -340,6 +363,98 @@ export default function StockDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Fundamentals Snapshot ──────────────────────────────────────────── */}
+      {stock.fundamentalsSnapshot && (
+        <Card className="border-border/50 bg-card/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-mono text-sm uppercase tracking-widest text-muted-foreground">
+              Fundamentals Snapshot
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-6 gap-y-4">
+              {stock.fundamentalsSnapshot.marketCap != null && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Market Cap</span>
+                  <span className="font-mono text-sm font-semibold">{fmtMarketCap(stock.fundamentalsSnapshot.marketCap)}</span>
+                </div>
+              )}
+              {stock.fundamentalsSnapshot.peRatio != null && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">P/E Ratio</span>
+                  <span className="font-mono text-sm font-semibold">{stock.fundamentalsSnapshot.peRatio.toFixed(1)}×</span>
+                </div>
+              )}
+              {stock.fundamentalsSnapshot.eps != null && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">EPS (TTM)</span>
+                  <span className={cn("font-mono text-sm font-semibold", stock.fundamentalsSnapshot.eps >= 0 ? "text-green-400" : "text-red-400")}>
+                    {stock.fundamentalsSnapshot.eps >= 0 ? "+" : ""}${stock.fundamentalsSnapshot.eps.toFixed(2)}
+                  </span>
+                </div>
+              )}
+              {stock.fundamentalsSnapshot.beta != null && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Beta</span>
+                  <span className="font-mono text-sm font-semibold">{stock.fundamentalsSnapshot.beta.toFixed(2)}</span>
+                </div>
+              )}
+              {stock.fundamentalsSnapshot.week52High != null && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">52W High</span>
+                  <span className="font-mono text-sm font-semibold text-green-400">${stock.fundamentalsSnapshot.week52High.toFixed(2)}</span>
+                </div>
+              )}
+              {stock.fundamentalsSnapshot.week52Low != null && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">52W Low</span>
+                  <span className="font-mono text-sm font-semibold text-red-400">${stock.fundamentalsSnapshot.week52Low.toFixed(2)}</span>
+                </div>
+              )}
+              {stock.fundamentalsSnapshot.sharesOutstanding != null && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Shares Out.</span>
+                  <span className="font-mono text-sm font-semibold">{fmtShares(stock.fundamentalsSnapshot.sharesOutstanding)}</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Latest News ───────────────────────────────────────────────────── */}
+      {stock.latestNews && stock.latestNews.length > 0 && (
+        <Card className="border-border/50 bg-card/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-mono text-sm uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <Newspaper className="h-3.5 w-3.5" />
+              Latest News
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col divide-y divide-border/40">
+            {stock.latestNews.map((article, i) => (
+              <a
+                key={i}
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex flex-col gap-1 py-3 first:pt-0 last:pb-0 hover:text-foreground transition-colors"
+              >
+                <span className="font-mono text-sm leading-snug text-foreground/80 group-hover:text-foreground transition-colors line-clamp-2">
+                  {article.headline}
+                </span>
+                <div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground/60 uppercase tracking-wide">
+                  <span>{article.source}</span>
+                  <span>·</span>
+                  <span>{fmtNewsTime(article.publishedAt)}</span>
+                  <ExternalLink className="h-2.5 w-2.5 ml-auto opacity-0 group-hover:opacity-60 transition-opacity" />
+                </div>
+              </a>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
     </div>
   );

@@ -31,6 +31,23 @@ export const ConfidenceTier = {
   STRONG_SELL: "STRONG SELL",
 } as const;
 
+export interface FundamentalsSnapshot {
+  marketCap:         number | null;
+  peRatio:           number | null;
+  eps:               number | null;
+  week52High:        number | null;
+  week52Low:         number | null;
+  beta:              number | null;
+  sharesOutstanding: number | null;
+}
+
+export interface NewsArticle {
+  headline:    string;
+  source:      string;
+  publishedAt: string;
+  url:         string;
+}
+
 export interface FinnhubContext {
   dailyChangePct: number | null;
   peRatio: number | null;
@@ -155,6 +172,8 @@ export interface StockSignalDetail {
   /** Full company name (empty string if unavailable) */
   company: string;
   finnhubContext: FinnhubContext;
+  fundamentalsSnapshot?: FundamentalsSnapshot | null;
+  latestNews?: NewsArticle[];
   priceHistory: PriceBar[];
 }
 

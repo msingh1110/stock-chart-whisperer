@@ -125,6 +125,28 @@ components:
       type: string
       enum: [STRONG BUY, BUY, HOLD, SELL, STRONG SELL]
 
+    FundamentalsSnapshot:
+      type: object
+      nullable: true
+      properties:
+        marketCap:         { type: number, nullable: true }
+        peRatio:           { type: number, nullable: true }
+        eps:               { type: number, nullable: true }
+        week52High:        { type: number, nullable: true }
+        week52Low:         { type: number, nullable: true }
+        beta:              { type: number, nullable: true }
+        sharesOutstanding: { type: number, nullable: true }
+      required: [marketCap, peRatio, eps, week52High, week52Low, beta, sharesOutstanding]
+
+    NewsArticle:
+      type: object
+      properties:
+        headline:    { type: string }
+        source:      { type: string }
+        publishedAt: { type: string }
+        url:         { type: string }
+      required: [headline, source, publishedAt, url]
+
     FinnhubContext:
       type: object
       properties:
@@ -375,6 +397,12 @@ components:
         company:
           type: string
           description: Full company name (empty string if unavailable)
+        fundamentalsSnapshot:
+          $ref: "#/components/schemas/FundamentalsSnapshot"
+        latestNews:
+          type: array
+          items:
+            $ref: "#/components/schemas/NewsArticle"
         priceHistory:
           type: array
           items:
