@@ -271,12 +271,12 @@ export default function StockDetail() {
           <CardTitle className="font-mono text-sm uppercase tracking-widest text-muted-foreground">Signal Breakdown</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <ScoreBar label="Trend"        score={stock.trendScore}        weight={0.35} />
-          <ScoreBar label="Momentum"     score={stock.momentumScore}     weight={0.25} />
-          <ScoreBar label="RSI"          score={stock.rsiScore}          weight={0.15} />
-          <ScoreBar label="Volume"       score={stock.volumeScore}       weight={0.10} />
+          <ScoreBar label="Trend"        score={stock.trendScore}        weight={0.32} />
+          <ScoreBar label="Momentum"     score={stock.momentumScore}     weight={0.23} />
+          <ScoreBar label="RSI"          score={stock.rsiScore}          weight={0.13} />
+          <ScoreBar label="Volume"       score={stock.volumeScore}       weight={0.15} />
           <ScoreBar label="News"         score={stock.newsScore}         weight={0.10} />
-          <ScoreBar label="Social"       score={stock.socialScore}       weight={0.03} />
+          <ScoreBar label="Social"       score={stock.socialScore}       weight={0.04} />
           <ScoreBar label="Fundamentals" score={stock.fundamentalsScore} weight={0.02} />
           <div className="border-t border-border/50 pt-3 mt-1">
             <ScoreBar label="Final Score" score={stock.finalScore} weight={null} highlight />
