@@ -1,0 +1,152 @@
+ADDENDUM: Enhanced Volume Signal (Higher Importance + Smarter Modeling)
+
+Improve the role of volume in the probability engine by:
+- slightly increasing its weight
+- making the volume signal more expressive (not just binary)
+- using it as a confirmation of price movement and conviction
+
+Goal:
+Make volume a stronger confirmation signal for breakouts and sell-offs, without overpowering trend and momentum.
+
+---
+
+1. Increase volume weight (moderately)
+
+Update weights:
+
+OLD:
+volume_weight = 0.10
+
+NEW:
+volume_weight = 0.15
+
+Updated model:
+
+final_score = (
+  0.32 * trend_score +
+  0.23 * momentum_score +
+  0.13 * rsi_score +
+  0.15 * volume_score +
+  0.10 * news_score +
+  0.04 * social_score +
+  0.02 * fundamentals_score +
+  0.01 * insider_score
+)
+
+Principle:
+- volume becomes a stronger confirmation layer
+- still secondary to trend and momentum
+
+---
+
+2. Upgrade volume signal (from binary → continuous)
+
+Replace simple logic:
+
+OLD:
+- high volume + price up → +1
+- high volume + price down → -1
+
+NEW: create a continuous volume score
+
+Step 1: compute volume ratio
+volume_ratio = current_volume / avg_volume_20d
+
+Step 2: cap extreme values
+volume_ratio = min(volume_ratio, 3.0)
+
+Step 3: detect direction
+price_change = (price - prev_close) / prev_close
+
+Step 4: compute volume_score
+
+if price_change > 0:
+    volume_score = min((volume_ratio - 1) * 1.2, 1.0)
+elif price_change < 0:
+    volume_score = max(-(volume_ratio - 1) * 1.2, -1.0)
+else:
+    volume_score = 0
+
+This gives:
+- small move + low volume → weak signal
+- strong move + high volume → strong signal
+
+---
+
+3. Add breakout amplification (important)
+
+Volume matters most during breakouts.
+
+Add rule:
+
+if price > MA20 and price crosses MA50 upward AND volume_ratio > 1.5:
+    volume_score += 0.2
+
+if price < MA20 and breaks below MA50 AND volume_ratio > 1.5:
+    volume_score -= 0.2
+
+Clamp to [-1, +1]
+
+---
+
+4. Add low-volume penalty (very important)
+
+Low volume = low conviction
+
+if volume_ratio < 0.8:
+    volume_score *= 0.5
+
+---
+
+5. Optional: spike detection
+
+if volume_ratio > 2:
+    volume_score *= 1.2
+
+Clamp again to [-1, +1]
+
+---
+
+6. Update explanation logic
+
+Make volume more visible when it matters:
+
+Examples:
+
+Bullish:
+"Price is trading above MA20 and MA50, with strong momentum and elevated volume confirming buying conviction."
+
+Bearish:
+"Price is below key moving averages, with negative momentum and heavy volume reinforcing selling pressure."
+
+Low conviction:
+"Price is above key averages, but muted volume suggests limited conviction behind the move."
+
+Rules:
+- mention volume only when:
+  - volume_ratio > 1.2 OR < 0.8
+- avoid mentioning it when neutral
+
+---
+
+7. UI impact
+
+No new UI elements required.
+
+Volume impact should:
+- reflect in probabilities
+- reflect in confidence tier
+- appear in explanation text
+
+---
+
+8. Goal
+
+Make volume:
+- a stronger confirmation signal
+- responsive to real market participation
+- especially impactful during breakouts and sell-offs
+
+Without:
+- overpowering trend/momentum
+- adding UI clutter

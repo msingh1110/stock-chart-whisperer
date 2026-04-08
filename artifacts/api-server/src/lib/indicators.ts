@@ -88,13 +88,14 @@ export interface StockAnalysis {
 // ── Scoring Config (tune weights & thresholds here) ───────────────────────
 
 const WEIGHTS = {
-  trend:        0.35,
-  momentum:     0.25,
-  rsi:          0.15,
-  volume:       0.10,
+  trend:        0.32,
+  momentum:     0.23,
+  rsi:          0.13,
+  volume:       0.15,
   news:         0.10,
-  social:       0.03,
+  social:       0.04,
   fundamentals: 0.02,
+  // insider: 0.01 — reserved for future use; omitted (always 0)
 } as const;
 
 // upProbability is in 0–100 range throughout
@@ -143,17 +144,42 @@ function computeRsiScore(rsi: number): number {
 }
 
 /**
- * Volume confirmation score: -1, 0, or +1.
- * Only fires when volume is meaningfully elevated (ratio > 1.2).
+ * Continuous volume score in [-1, +1].
+ *
+ * 1. Scales with volume_ratio (capped at 3×), giving proportional signals
+ *    instead of the old binary ±1.
+ * 2. Breakout amplification: ±0.2 bonus when price crosses MA50 with high volume.
+ * 3. Low-volume penalty: halves the score when ratio < 0.8 (low conviction).
+ * 4. Spike multiplier: ×1.2 when ratio > 2× (confirms strong participation).
  */
 function computeVolumeScore(
   volumeRatio: number,
-  price: number,
-  prevClose: number,
+  price:       number,
+  prevClose:   number,
+  ma20:        number,
+  ma50:        number,
 ): number {
-  if (volumeRatio > 1.2 && price > prevClose) return 1;
-  if (volumeRatio > 1.2 && price < prevClose) return -1;
-  return 0;
+  const ratio       = Math.min(volumeRatio, 3.0);
+  const priceChange = (price - prevClose) / prevClose;
+
+  let score: number;
+  if (priceChange > 0)      score = Math.min((ratio - 1) * 1.2, 1.0);
+  else if (priceChange < 0) score = Math.max(-(ratio - 1) * 1.2, -1.0);
+  else                      score = 0;
+
+  // Breakout amplification: reward confirmed breakouts / breakdowns
+  if (price > ma20 && price > ma50 && ratio > 1.5)
+    score = Math.min(score + 0.2, 1.0);
+  if (price < ma20 && price < ma50 && ratio > 1.5)
+    score = Math.max(score - 0.2, -1.0);
+
+  // Low-volume penalty: weak participation → reduce conviction
+  if (ratio < 0.8) score *= 0.5;
+
+  // Volume spike amplifier: strong participation → boost signal
+  if (ratio > 2) score = Math.max(-1, Math.min(1, score * 1.2));
+
+  return score;
 }
 
 // ── Explanation Builder ────────────────────────────────────────────────────
@@ -163,6 +189,7 @@ function buildExplanation(
   momentumScore:        number,
   rsi:                  number,
   volumeScore:          number,
+  volumeRatio:          number,
   confidenceTier:       ConfidenceTier,
   price:                number,
   ma20:                 number,
@@ -188,17 +215,30 @@ function buildExplanation(
   const newsPositive = newsScore >= 0.3 && newsSentimentSummary === "positive";
   const newsNegative = newsScore <= -0.3 && newsSentimentSummary === "negative";
 
+  // Volume context phrases — only fire when ratio is clearly elevated or muted
+  const volHigh  = volumeRatio >= 1.5;
+  const volMid   = volumeRatio >= 1.2 && volumeRatio < 1.5;
+  const volLow   = volumeRatio < 0.8;
+
+  const volBullPhrase = volHigh ? "elevated volume confirming buying conviction"
+                      : volMid  ? "above-average volume supporting the move"
+                      : null;
+  const volBearPhrase = volHigh ? "heavy volume reinforcing selling pressure"
+                      : volMid  ? "above-average volume confirming distribution"
+                      : null;
+  const volLowPhrase  = volLow  ? "muted volume suggesting limited conviction" : null;
+
   switch (confidenceTier) {
     case "STRONG BUY": {
       const maStr = aboveMa20 && aboveMa50
         ? "well above MA20 and MA50"
         : "above key moving averages";
       const factors: string[] = [];
-      if (mStrong)          factors.push("strong upside momentum");
-      else if (mMild)       factors.push("improving momentum");
-      if (volumeScore > 0)  factors.push("above-average volume reinforcing bullish conviction");
-      else if (rsiBullish)  factors.push(`RSI at ${rsiN} in a healthy bullish range`);
-      if (newsPositive)     factors.push("supportive news flow");
+      if (mStrong)           factors.push("strong upside momentum");
+      else if (mMild)        factors.push("improving momentum");
+      if (volBullPhrase)     factors.push(volBullPhrase);
+      else if (rsiBullish)   factors.push(`RSI at ${rsiN} in a healthy bullish range`);
+      if (newsPositive && factors.length < 2) factors.push("supportive news flow");
       const tail = factors.length ? `, with ${factors.slice(0, 2).join(" and ")}` : "";
       return `Price is trading ${maStr}${tail}, signaling high-conviction bullish momentum.`;
     }
@@ -210,12 +250,15 @@ function buildExplanation(
           ? "above MA20"
           : "near key moving averages";
       const factors: string[] = [];
-      if (mStrong || mMild) factors.push("positive momentum");
-      if (rsiBullish)       factors.push(`RSI at ${rsiN} in a healthy range`);
-      if (volumeScore > 0)  factors.push("volume confirming buying interest");
-      if (newsPositive && factors.length < 2) factors.push("supportive news flow");
+      if (mStrong || mMild)  factors.push("positive momentum");
+      if (rsiBullish)        factors.push(`RSI at ${rsiN} in a healthy range`);
+      if (volBullPhrase && factors.length < 2) factors.push(volBullPhrase);
+      if (newsPositive && factors.length < 2)  factors.push("supportive news flow");
       const top = factors.slice(0, 2);
-      if (top.length === 0) return `Price is holding ${maStr}.`;
+      if (top.length === 0) {
+        if (volLowPhrase) return `Price is holding ${maStr}, though ${volLowPhrase}.`;
+        return `Price is holding ${maStr}.`;
+      }
       if (top.length === 1) return `Price is holding ${maStr}, with ${top[0]} supporting the upside.`;
       return `Price is holding ${maStr}, while ${top.join(" and ")} favor upside.`;
     }
@@ -232,12 +275,12 @@ function buildExplanation(
           : rsiOverbought
             ? `RSI at ${rsiN} is stretched, capping near-term upside`
             : `RSI at ${rsiN} is neutral`;
-      const newsTail = newsPositive
-        ? " while news flow leans positive"
-        : newsNegative
-          ? " while news flow is cautious"
-          : "";
-      return `Price is trading ${maStr} with no strong directional edge — ${rsiNote} and the ${maAlignNote}${newsTail}.`;
+      // Volume color for HOLD — low conviction note is especially useful here
+      const volTail = volLowPhrase ? ` while ${volLowPhrase} behind the move`
+                    : newsPositive ? " while news flow leans positive"
+                    : newsNegative ? " while news flow is cautious"
+                    : "";
+      return `Price is trading ${maStr} with no strong directional edge — ${rsiNote} and the ${maAlignNote}${volTail}.`;
     }
 
     case "SELL": {
@@ -250,8 +293,8 @@ function buildExplanation(
       if (mBear)            factors.push("weakening momentum");
       if (rsiBearish)       factors.push(`RSI at ${rsiN} in oversold territory`);
       else if (rsiWeak)     factors.push(`soft RSI at ${rsiN}`);
-      if (volumeScore < 0)  factors.push("elevated volume confirming distribution");
-      if (newsNegative && factors.length < 2) factors.push("negative news sentiment");
+      if (volBearPhrase && factors.length < 2) factors.push(volBearPhrase);
+      if (newsNegative && factors.length < 2)  factors.push("negative news sentiment");
       const top = factors.slice(0, 2);
       if (top.length === 0) return `Price is trading ${maStr}, reinforcing a bearish setup.`;
       if (top.length === 1) return `Price is trading ${maStr}, with ${top[0]} reinforcing the bearish setup.`;
@@ -263,10 +306,10 @@ function buildExplanation(
         ? "below MA20 and MA50"
         : "below key moving averages";
       const factors: string[] = [];
-      if (mBear)            factors.push("negative momentum");
-      if (rsiBearish)       factors.push(`RSI at ${rsiN} in deeply oversold territory`);
-      if (volumeScore < 0)  factors.push("heavy selling volume");
-      if (newsNegative)     factors.push("negative news sentiment");
+      if (mBear)             factors.push("negative momentum");
+      if (rsiBearish)        factors.push(`RSI at ${rsiN} in deeply oversold territory`);
+      if (volBearPhrase)     factors.push(volBearPhrase);
+      if (newsNegative)      factors.push("negative news sentiment");
       if (factors.length < 2) factors.push("deteriorating technicals across the board");
       return `Price remains ${maStr}, while ${factors.slice(0, 2).join(" and ")} signal persistent selling pressure.`;
     }
@@ -288,13 +331,14 @@ function aggregateScore(
   fundamentalsScore: number,
 ): number {
   return (
-    WEIGHTS.trend        * trendScore    +
-    WEIGHTS.momentum     * momentumScore +
-    WEIGHTS.rsi          * rsiScore      +
-    WEIGHTS.volume       * volumeScore   +
-    WEIGHTS.news         * newsScore     +
-    WEIGHTS.social       * socialScore   +
+    WEIGHTS.trend        * trendScore        +
+    WEIGHTS.momentum     * momentumScore     +
+    WEIGHTS.rsi          * rsiScore          +
+    WEIGHTS.volume       * volumeScore       +
+    WEIGHTS.news         * newsScore         +
+    WEIGHTS.social       * socialScore       +
     WEIGHTS.fundamentals * fundamentalsScore
+    // + 0.01 * insiderScore (always 0 — reserved)
   );
 }
 
@@ -381,7 +425,7 @@ export function analyzeStock(
   const trendScore    = computeTrendScore(currentPrice, ma20, ma50);
   const momentumScore = Math.round(computeMomentumScore(currentPrice, price5dAgo) * 10000) / 10000;
   const rsiScore      = computeRsiScore(rsi);
-  const volumeScore   = computeVolumeScore(volumeRatio, currentPrice, prevClose);
+  const volumeScore   = computeVolumeScore(volumeRatio, currentPrice, prevClose, ma20, ma50);
 
   const { newsScore, socialScore, fundamentalsScore, finnhubContext } = enrichment;
 
@@ -397,6 +441,7 @@ export function analyzeStock(
   const confidenceTier = mapConfidenceTier(upProbability);
   const explanation    = buildExplanation(
     trendScore, momentumScore, rsi, volumeScore,
+    volumeRatio,
     confidenceTier, currentPrice, ma20, ma50,
     newsScore, finnhubContext.newsSentimentSummary,
   );
