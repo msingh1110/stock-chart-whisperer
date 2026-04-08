@@ -1,0 +1,280 @@
+ADDENDUM: Integrate Finnhub into the Probability + Confidence Script
+
+Enhance the existing Python signal engine so Alpaca remains the primary data source for price-based technical analysis, while Finnhub is added as a supplementary signal source for news, sentiment, quote validation, and basic fundamentals.
+
+Goal:
+Improve the quality of up/down probability and confidence tiers by incorporating lightweight non-price context from Finnhub without replacing the existing Alpaca-based technical engine.
+
+---
+
+1. Source-of-truth design
+
+Keep Alpaca as the primary source for:
+- historical daily bars
+- latest price bars
+- MA20 / MA50
+- RSI
+- momentum
+- volume
+- current probability engine
+- BUY / SELL / HOLD logic
+- confidence tier logic
+
+Use Finnhub only as an additive enrichment layer for:
+- recent company news
+- news sentiment proxy
+- social sentiment proxy
+- quote validation / daily move context
+- fundamentals snapshot for optional probability adjustment
+
+Do not replace Alpaca historical bar logic.
+
+---
+
+2. Finnhub API integration
+
+Add Finnhub as a second client in the Python backend.
+
+Use environment variable:
+- FINNHUB_API_KEY
+
+Create a dedicated service module, for example:
+- services/finnhub_service.py
+
+Add helper functions such as:
+- get_finnhub_quote(symbol)
+- get_finnhub_basic_financials(symbol)
+- get_finnhub_company_news(symbol, from_date, to_date)
+- get_finnhub_social_sentiment(symbol)
+
+If available, also support:
+- get_finnhub_recommendation_trends(symbol)   # optional later
+- get_finnhub_earnings_sentiment(symbol)      # optional later
+
+---
+
+3. What Finnhub should contribute to the signal engine
+
+Add 3 new optional signal components to the existing probability model:
+
+A. News sentiment component
+Use recent Finnhub company news to derive a lightweight directional signal.
+
+Implementation idea:
+- pull the last 5–10 recent articles over the last 24–72 hours
+- use headline + summary text if available
+- assign a simple sentiment score:
+  - positive = +1
+  - neutral = 0
+  - negative = -1
+- average the article scores
+
+Convert into a bounded component:
+- news_score in range [-1, +1]
+
+If sentiment analysis is not implemented yet:
+- use a placeholder rule-based keyword model
+- keep logic modular so it can later be replaced with an LLM or sentiment model
+
+Suggested weight:
+- news_weight = 0.10
+
+B. Social sentiment component
+Use Finnhub social sentiment as a lightweight retail/attention proxy.
+
+Implementation idea:
+- derive a score from bullish vs bearish mention balance
+- convert into:
+  - social_score in range [-1, +1]
+
+Suggested weight:
+- social_weight = 0.05
+
+C. Fundamentals quality component
+Use Finnhub basic financials only as a mild quality/context factor, not a core trading signal.
+
+Possible factors:
+- reasonable P/E
+- positive EPS
+- healthy revenue growth if available
+- not too stretched vs fundamentals
+
+Convert into:
+- fundamentals_score in range [-0.5, +0.5]
+
+Suggested weight:
+- fundamentals_weight = 0.05
+
+Important:
+- fundamentals should have a lower weight than trend/momentum
+- do not let fundamentals dominate short-term signals
+
+---
+
+4. Updated scoring architecture
+
+Keep the existing technical model as the backbone.
+
+Current technical structure:
+- trend_score
+- momentum_score
+- rsi_score
+- volume_score
+
+Add new Finnhub components:
+- news_score
+- social_score
+- fundamentals_score
+
+Suggested new weighted formula:
+
+final_score = (
+  0.35 * trend_score +
+  0.25 * momentum_score +
+  0.15 * rsi_score +
+  0.10 * volume_score +
+  0.10 * news_score +
+  0.03 * social_score +
+  0.02 * fundamentals_score
+)
+
+Requirements:
+- keep final_score bounded to [-1, +1]
+- keep technicals dominant
+- use Finnhub as context / booster only
+
+---
+
+5. Probability conversion
+
+Keep the current probability mapping:
+
+- up_probability = (final_score + 1) / 2
+- down_probability = 1 - up_probability
+
+Clamp values safely to [0, 1].
+
+---
+
+6. Confidence tier logic
+
+Keep the current 5-tier structure:
+
+- STRONG BUY if up_probability >= 0.80
+- BUY if up_probability >= 0.65 and < 0.80
+- HOLD otherwise
+- SELL if down_probability >= 0.65 and < 0.80
+- STRONG SELL if down_probability >= 0.80
+
+---
+
+7. Backend output changes
+
+Extend the signal result to include the Finnhub-derived components and summary fields.
+
+Example output:
+
+{
+  "ticker": "NVDA",
+  "price": 123.45,
+  "ma20": 118.22,
+  "ma50": 110.11,
+  "rsi": 58.4,
+  "trend_score": 1.0,
+  "momentum_score": 0.18,
+  "rsi_score": 0.5,
+  "volume_score": 1.0,
+  "news_score": 0.4,
+  "social_score": 0.2,
+  "fundamentals_score": 0.1,
+  "final_score": 0.71,
+  "up_probability": 0.855,
+  "down_probability": 0.145,
+  "signal": "BUY",
+  "confidence_tier": "STRONG BUY",
+  "finnhub_context": {
+    "daily_change_pct": 1.27,
+    "market_cap": 3000000000000,
+    "pe_ratio": 62.1,
+    "eps": 2.45,
+    "news_headline_count": 6,
+    "news_sentiment_summary": "positive",
+    "social_sentiment_summary": "bullish"
+  }
+}
+
+---
+
+8. Explanation logic update
+
+Update the single explanation string so it can optionally incorporate Finnhub context when it materially strengthens the signal.
+
+Examples:
+- "Price is holding above MA20 and MA50, while positive momentum and supportive news flow strengthen the bullish setup."
+- "Price remains below key moving averages, with weak momentum and negative news sentiment reinforcing downside pressure."
+- "Trend signals are mixed, while neutral news flow and limited momentum offer no strong directional edge."
+
+Rules:
+- still show only one explanation on the UI
+- keep it concise
+- mention news or sentiment only when it materially matters
+- do not force Finnhub context into every explanation
+
+---
+
+9. Error handling and fallback behavior
+
+Finnhub should be additive, never blocking.
+
+Rules:
+- if Finnhub fails, still compute the full Alpaca-based signal
+- default:
+  - news_score = 0
+  - social_score = 0
+  - fundamentals_score = 0
+- do not let missing Finnhub data break confidence tiers or probabilities
+- use defensive null handling
+
+---
+
+10. Caching and rate-limit handling
+
+Add basic caching to reduce Finnhub API usage.
+
+Recommended:
+- company profile / basic financials: cache 12–24 hours
+- quote / market stats: cache 1–5 minutes
+- news: cache 10–30 minutes
+- social sentiment: cache 10–30 minutes
+
+This is especially important if the dashboard loads multiple tickers.
+
+---
+
+11. Code structure
+
+Refactor the current Python script into clean modules if needed:
+
+- alpaca_service.py
+- finnhub_service.py
+- indicators.py
+- probability_engine.py
+- explanation_engine.py
+
+Keep responsibilities separate:
+- Alpaca fetches price bars
+- Finnhub fetches enrichment/context
+- indicators compute technical values
+- probability engine combines all component scores
+- explanation engine generates the final one-line insight
+
+---
+
+12. Goal
+
+Make the existing confidence + up/down probability script more intelligent by combining:
+- Alpaca technical structure
+- Finnhub news and sentiment context
+- lightweight fundamentals quality checks
+
+The result should feel more premium and robust while keeping the logic interpretable and technically grounded.

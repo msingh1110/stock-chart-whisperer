@@ -31,6 +31,15 @@ export const ConfidenceTier = {
   STRONG_SELL: "STRONG SELL",
 } as const;
 
+export interface FinnhubContext {
+  dailyChangePct: number | null;
+  peRatio: number | null;
+  eps: number | null;
+  newsHeadlineCount: number;
+  newsSentimentSummary: 'positive' | 'neutral' | 'negative';
+  socialSentimentSummary: 'bullish' | 'neutral' | 'bearish';
+}
+
 export interface StockSignal {
   ticker: string;
   currentPrice: number;
@@ -63,6 +72,12 @@ export interface StockSignal {
   rsiScore: number;
   /** Volume confirmation score (-1, 0, or +1) */
   volumeScore: number;
+  /** Finnhub news sentiment score in [-1, +1]; 0 when unavailable */
+  newsScore: number;
+  /** Finnhub social sentiment score in [-1, +1]; 0 when unavailable */
+  socialScore: number;
+  /** Finnhub fundamentals quality score in [-0.5, +0.5]; 0 when unavailable */
+  fundamentalsScore: number;
   /** Raw 5-day price momentum as a decimal fraction */
   momentum: number;
   /** Most-recent bar volume */
@@ -75,6 +90,7 @@ export interface StockSignal {
   explanation: string;
   /** Full company name (empty string if unavailable) */
   company: string;
+  finnhubContext: FinnhubContext;
 }
 
 export interface PriceBar {
@@ -120,6 +136,12 @@ export interface StockSignalDetail {
   rsiScore: number;
   /** Volume confirmation score (-1, 0, or +1) */
   volumeScore: number;
+  /** Finnhub news sentiment score in [-1, +1]; 0 when unavailable */
+  newsScore: number;
+  /** Finnhub social sentiment score in [-1, +1]; 0 when unavailable */
+  socialScore: number;
+  /** Finnhub fundamentals quality score in [-0.5, +0.5]; 0 when unavailable */
+  fundamentalsScore: number;
   /** Raw 5-day price momentum as a decimal fraction */
   momentum: number;
   /** Most-recent bar volume */
@@ -132,6 +154,7 @@ export interface StockSignalDetail {
   explanation: string;
   /** Full company name (empty string if unavailable) */
   company: string;
+  finnhubContext: FinnhubContext;
   priceHistory: PriceBar[];
 }
 

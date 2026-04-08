@@ -125,6 +125,34 @@ components:
       type: string
       enum: [STRONG BUY, BUY, HOLD, SELL, STRONG SELL]
 
+    FinnhubContext:
+      type: object
+      properties:
+        dailyChangePct:
+          type: number
+          nullable: true
+        peRatio:
+          type: number
+          nullable: true
+        eps:
+          type: number
+          nullable: true
+        newsHeadlineCount:
+          type: number
+        newsSentimentSummary:
+          type: string
+          enum: [positive, neutral, negative]
+        socialSentimentSummary:
+          type: string
+          enum: [bullish, neutral, bearish]
+      required:
+        - dailyChangePct
+        - peRatio
+        - eps
+        - newsHeadlineCount
+        - newsSentimentSummary
+        - socialSentimentSummary
+
     StockSignal:
       type: object
       properties:
@@ -178,6 +206,17 @@ components:
         volumeScore:
           type: number
           description: Volume confirmation score (-1, 0, or +1)
+        newsScore:
+          type: number
+          description: Finnhub news sentiment score in [-1, +1]; 0 when unavailable
+        socialScore:
+          type: number
+          description: Finnhub social sentiment score in [-1, +1]; 0 when unavailable
+        fundamentalsScore:
+          type: number
+          description: Finnhub fundamentals quality score in [-0.5, +0.5]; 0 when unavailable
+        finnhubContext:
+          $ref: "#/components/schemas/FinnhubContext"
         momentum:
           type: number
           description: Raw 5-day price momentum as a decimal fraction
@@ -217,6 +256,10 @@ components:
         - momentumScore
         - rsiScore
         - volumeScore
+        - newsScore
+        - socialScore
+        - fundamentalsScore
+        - finnhubContext
         - momentum
         - volume
         - averageVolume
@@ -303,6 +346,17 @@ components:
         volumeScore:
           type: number
           description: Volume confirmation score (-1, 0, or +1)
+        newsScore:
+          type: number
+          description: Finnhub news sentiment score in [-1, +1]; 0 when unavailable
+        socialScore:
+          type: number
+          description: Finnhub social sentiment score in [-1, +1]; 0 when unavailable
+        fundamentalsScore:
+          type: number
+          description: Finnhub fundamentals quality score in [-0.5, +0.5]; 0 when unavailable
+        finnhubContext:
+          $ref: "#/components/schemas/FinnhubContext"
         momentum:
           type: number
           description: Raw 5-day price momentum as a decimal fraction
@@ -346,6 +400,10 @@ components:
         - momentumScore
         - rsiScore
         - volumeScore
+        - newsScore
+        - socialScore
+        - fundamentalsScore
+        - finnhubContext
         - momentum
         - volume
         - averageVolume

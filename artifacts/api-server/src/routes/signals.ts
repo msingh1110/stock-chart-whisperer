@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { fetchDailyBars } from "../lib/alpaca";
 import { analyzeStock } from "../lib/indicators";
+import { enrichWithFinnhub } from "../lib/finnhub";
 import { getCompanyName } from "../lib/company";
 import {
   GetAllSignalsResponse,
@@ -13,7 +14,6 @@ const router: IRouter = Router();
 
 const PORTFOLIO_TICKERS = ["NVDA", "MSFT", "AAPL", "META", "SOFI", "HOOD", "SHEL", "LMT", "IAU", "SLV"];
 
-// Simple in-memory cache — bust after 5 minutes
 interface CacheEntry<T> {
   data: T;
   fetchedAt: number;
@@ -27,9 +27,14 @@ async function fetchAllSignals() {
     return signalsCache.data;
   }
 
-  const barsMap = await fetchDailyBars(PORTFOLIO_TICKERS);
-  const analyses = PORTFOLIO_TICKERS.map((ticker) =>
-    analyzeStock(ticker, barsMap[ticker] ?? []),
+  // Fetch bars and Finnhub enrichments in parallel
+  const [barsMap, enrichments] = await Promise.all([
+    fetchDailyBars(PORTFOLIO_TICKERS),
+    Promise.all(PORTFOLIO_TICKERS.map((t) => enrichWithFinnhub(t))),
+  ]);
+
+  const analyses = PORTFOLIO_TICKERS.map((ticker, i) =>
+    analyzeStock(ticker, barsMap[ticker] ?? [], enrichments[i]),
   );
 
   signalsCache = { data: analyses, fetchedAt: now };
@@ -41,31 +46,35 @@ router.get("/signals", async (req, res): Promise<void> => {
   const analyses = await fetchAllSignals();
   const payload = await Promise.all(
     analyses.map(async (a) => ({
-      ticker:         a.ticker,
-      currentPrice:   a.currentPrice,
-      prevClose:      a.prevClose,
-      ma20:           a.ma20,
-      ma50:           a.ma50,
-      rsi:            a.rsi,
-      price5dAgo:     a.price5dAgo,
-      signal:         a.signal,
-      confidenceTier: a.confidenceTier,
-      explanation:    a.explanation,
-      change:         a.change,
-      changePercent:  a.changePercent,
-      lastUpdated:    a.lastUpdated,
-      upProbability:  a.upProbability,
-      downProbability: a.downProbability,
-      finalScore:     a.finalScore,
-      trendScore:     a.trendScore,
-      momentumScore:  a.momentumScore,
-      rsiScore:       a.rsiScore,
-      volumeScore:    a.volumeScore,
-      momentum:       a.momentum,
-      volume:         a.volume,
-      averageVolume:  a.averageVolume,
-      volumeRatio:    a.volumeRatio,
-      company:        await getCompanyName(a.ticker),
+      ticker:            a.ticker,
+      currentPrice:      a.currentPrice,
+      prevClose:         a.prevClose,
+      ma20:              a.ma20,
+      ma50:              a.ma50,
+      rsi:               a.rsi,
+      price5dAgo:        a.price5dAgo,
+      signal:            a.signal,
+      confidenceTier:    a.confidenceTier,
+      explanation:       a.explanation,
+      change:            a.change,
+      changePercent:     a.changePercent,
+      lastUpdated:       a.lastUpdated,
+      upProbability:     a.upProbability,
+      downProbability:   a.downProbability,
+      finalScore:        a.finalScore,
+      trendScore:        a.trendScore,
+      momentumScore:     a.momentumScore,
+      rsiScore:          a.rsiScore,
+      volumeScore:       a.volumeScore,
+      newsScore:         a.newsScore,
+      socialScore:       a.socialScore,
+      fundamentalsScore: a.fundamentalsScore,
+      momentum:          a.momentum,
+      volume:            a.volume,
+      averageVolume:     a.averageVolume,
+      volumeRatio:       a.volumeRatio,
+      finnhubContext:    a.finnhubContext,
+      company:           await getCompanyName(a.ticker),
     })),
   );
   res.json(GetAllSignalsResponse.parse(payload));
@@ -81,7 +90,6 @@ router.get("/signals/:ticker", async (req, res): Promise<void> => {
 
   const ticker = params.data.ticker.toUpperCase();
 
-  // Fetch and analyse any valid ticker (not restricted to the portfolio)
   let bars: Awaited<ReturnType<typeof fetchDailyBars>>[string];
   try {
     const barsMap = await fetchDailyBars([ticker]);
@@ -96,8 +104,9 @@ router.get("/signals/:ticker", async (req, res): Promise<void> => {
     return;
   }
 
-  const analysis = analyzeStock(ticker, bars);
-  const company = await getCompanyName(ticker);
+  const enrichment = await enrichWithFinnhub(ticker);
+  const analysis   = analyzeStock(ticker, bars, enrichment);
+  const company    = await getCompanyName(ticker);
   res.json(GetSignalByTickerResponse.parse({ ...analysis, company }));
 });
 
@@ -105,7 +114,7 @@ router.get("/signals/:ticker", async (req, res): Promise<void> => {
 router.get("/portfolio/summary", async (req, res): Promise<void> => {
   const analyses = await fetchAllSignals();
 
-  const buyCount = analyses.filter((a) => a.signal === "BUY").length;
+  const buyCount  = analyses.filter((a) => a.signal === "BUY").length;
   const sellCount = analyses.filter((a) => a.signal === "SELL").length;
   const holdCount = analyses.filter((a) => a.signal === "HOLD").length;
 

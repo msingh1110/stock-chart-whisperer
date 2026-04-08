@@ -1,4 +1,5 @@
 import { DailyBar } from "./alpaca";
+import { FinnhubEnrichment, FinnhubContext, NULL_ENRICHMENT } from "./finnhub";
 
 // ── Simple Indicators ──────────────────────────────────────────────────────
 
@@ -39,6 +40,8 @@ export function computeRSI(closes: number[], period = 14): (number | null)[] {
 export type SignalType = "BUY" | "SELL" | "HOLD";
 export type ConfidenceTier = "STRONG BUY" | "BUY" | "HOLD" | "SELL" | "STRONG SELL";
 
+export type { FinnhubContext };
+
 export interface PriceBarWithIndicators {
   date: string;
   close: number;
@@ -71,20 +74,27 @@ export interface StockAnalysis {
   momentumScore: number;
   rsiScore: number;
   volumeScore: number;
+  newsScore: number;
+  socialScore: number;
+  fundamentalsScore: number;
   momentum: number;
   volume: number;
   averageVolume: number;
   volumeRatio: number;
+  finnhubContext: FinnhubContext;
   priceHistory: PriceBarWithIndicators[];
 }
 
 // ── Scoring Config (tune weights & thresholds here) ───────────────────────
 
 const WEIGHTS = {
-  trend:    0.4,
-  momentum: 0.3,
-  rsi:      0.2,
-  volume:   0.1,
+  trend:        0.35,
+  momentum:     0.25,
+  rsi:          0.15,
+  volume:       0.10,
+  news:         0.10,
+  social:       0.03,
+  fundamentals: 0.02,
 } as const;
 
 // upProbability is in 0–100 range throughout
@@ -146,17 +156,19 @@ function computeVolumeScore(
   return 0;
 }
 
-// ── Explanation Builder (mirrors Python build_explanation) ─────────────────
+// ── Explanation Builder ────────────────────────────────────────────────────
 
 function buildExplanation(
-  trendScore:    number,
-  momentumScore: number,
-  rsi:           number,
-  volumeScore:   number,
-  confidenceTier: ConfidenceTier,
-  price:  number,
-  ma20:   number,
-  ma50:   number,
+  trendScore:           number,
+  momentumScore:        number,
+  rsi:                  number,
+  volumeScore:          number,
+  confidenceTier:       ConfidenceTier,
+  price:                number,
+  ma20:                 number,
+  ma50:                 number,
+  newsScore:            number,
+  newsSentimentSummary: "positive" | "neutral" | "negative",
 ): string {
   const aboveMa20     = price > ma20;
   const aboveMa50     = price > ma50;
@@ -164,16 +176,17 @@ function buildExplanation(
 
   const rsiN = Math.round(rsi);
 
-  // RSI zone helpers
   const rsiBullish    = rsi >= 50 && rsi <= 65;
   const rsiBearish    = rsi < 40;
   const rsiOverbought = rsi > 75;
   const rsiWeak       = rsi >= 40 && rsi < 50;
 
-  // Momentum zone helpers
   const mStrong = momentumScore >= 0.4;
   const mMild   = momentumScore >= 0.1;
   const mBear   = momentumScore <= -0.2;
+
+  const newsPositive = newsScore >= 0.3 && newsSentimentSummary === "positive";
+  const newsNegative = newsScore <= -0.3 && newsSentimentSummary === "negative";
 
   switch (confidenceTier) {
     case "STRONG BUY": {
@@ -185,6 +198,7 @@ function buildExplanation(
       else if (mMild)       factors.push("improving momentum");
       if (volumeScore > 0)  factors.push("above-average volume reinforcing bullish conviction");
       else if (rsiBullish)  factors.push(`RSI at ${rsiN} in a healthy bullish range`);
+      if (newsPositive)     factors.push("supportive news flow");
       const tail = factors.length ? `, with ${factors.slice(0, 2).join(" and ")}` : "";
       return `Price is trading ${maStr}${tail}, signaling high-conviction bullish momentum.`;
     }
@@ -199,6 +213,7 @@ function buildExplanation(
       if (mStrong || mMild) factors.push("positive momentum");
       if (rsiBullish)       factors.push(`RSI at ${rsiN} in a healthy range`);
       if (volumeScore > 0)  factors.push("volume confirming buying interest");
+      if (newsPositive && factors.length < 2) factors.push("supportive news flow");
       const top = factors.slice(0, 2);
       if (top.length === 0) return `Price is holding ${maStr}.`;
       if (top.length === 1) return `Price is holding ${maStr}, with ${top[0]} supporting the upside.`;
@@ -206,8 +221,8 @@ function buildExplanation(
     }
 
     case "HOLD": {
-      const maStr        = aboveMa20 ? "above MA20" : "below MA20";
-      const maAlignNote  = ma20AboveMa50
+      const maStr       = aboveMa20 ? "above MA20" : "below MA20";
+      const maAlignNote = ma20AboveMa50
         ? "longer-term trend remains intact"
         : "longer-term trend is under pressure";
       const rsiNote = rsiBullish
@@ -217,7 +232,12 @@ function buildExplanation(
           : rsiOverbought
             ? `RSI at ${rsiN} is stretched, capping near-term upside`
             : `RSI at ${rsiN} is neutral`;
-      return `Price is trading ${maStr} with no strong directional edge — ${rsiNote} and the ${maAlignNote}.`;
+      const newsTail = newsPositive
+        ? " while news flow leans positive"
+        : newsNegative
+          ? " while news flow is cautious"
+          : "";
+      return `Price is trading ${maStr} with no strong directional edge — ${rsiNote} and the ${maAlignNote}${newsTail}.`;
     }
 
     case "SELL": {
@@ -227,10 +247,11 @@ function buildExplanation(
           ? "below MA20"
           : "below key support";
       const factors: string[] = [];
-      if (mBear)           factors.push("weakening momentum");
-      if (rsiBearish)      factors.push(`RSI at ${rsiN} in oversold territory`);
-      else if (rsiWeak)    factors.push(`soft RSI at ${rsiN}`);
-      if (volumeScore < 0) factors.push("elevated volume confirming distribution");
+      if (mBear)            factors.push("weakening momentum");
+      if (rsiBearish)       factors.push(`RSI at ${rsiN} in oversold territory`);
+      else if (rsiWeak)     factors.push(`soft RSI at ${rsiN}`);
+      if (volumeScore < 0)  factors.push("elevated volume confirming distribution");
+      if (newsNegative && factors.length < 2) factors.push("negative news sentiment");
       const top = factors.slice(0, 2);
       if (top.length === 0) return `Price is trading ${maStr}, reinforcing a bearish setup.`;
       if (top.length === 1) return `Price is trading ${maStr}, with ${top[0]} reinforcing the bearish setup.`;
@@ -242,9 +263,10 @@ function buildExplanation(
         ? "below MA20 and MA50"
         : "below key moving averages";
       const factors: string[] = [];
-      if (mBear)           factors.push("negative momentum");
-      if (rsiBearish)      factors.push(`RSI at ${rsiN} in deeply oversold territory`);
-      if (volumeScore < 0) factors.push("heavy selling volume");
+      if (mBear)            factors.push("negative momentum");
+      if (rsiBearish)       factors.push(`RSI at ${rsiN} in deeply oversold territory`);
+      if (volumeScore < 0)  factors.push("heavy selling volume");
+      if (newsNegative)     factors.push("negative news sentiment");
       if (factors.length < 2) factors.push("deteriorating technicals across the board");
       return `Price remains ${maStr}, while ${factors.slice(0, 2).join(" and ")} signal persistent selling pressure.`;
     }
@@ -257,16 +279,22 @@ function buildExplanation(
  * Weighted final score → stays roughly within [-1, +1].
  */
 function aggregateScore(
-  trendScore: number,
-  momentumScore: number,
-  rsiScore: number,
-  volumeScore: number,
+  trendScore:        number,
+  momentumScore:     number,
+  rsiScore:          number,
+  volumeScore:       number,
+  newsScore:         number,
+  socialScore:       number,
+  fundamentalsScore: number,
 ): number {
   return (
-    WEIGHTS.trend    * trendScore +
-    WEIGHTS.momentum * momentumScore +
-    WEIGHTS.rsi      * rsiScore +
-    WEIGHTS.volume   * volumeScore
+    WEIGHTS.trend        * trendScore    +
+    WEIGHTS.momentum     * momentumScore +
+    WEIGHTS.rsi          * rsiScore      +
+    WEIGHTS.volume       * volumeScore   +
+    WEIGHTS.news         * newsScore     +
+    WEIGHTS.social       * socialScore   +
+    WEIGHTS.fundamentals * fundamentalsScore
   );
 }
 
@@ -298,7 +326,11 @@ function mapConfidenceTier(upProbability: number): ConfidenceTier {
 
 // ── Main Analyzer ──────────────────────────────────────────────────────────
 
-export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
+export function analyzeStock(
+  ticker:     string,
+  bars:       DailyBar[],
+  enrichment: FinnhubEnrichment = NULL_ENRICHMENT,
+): StockAnalysis {
   if (bars.length < 51) {
     throw new Error(
       `Not enough data for ${ticker}: got ${bars.length} bars, need at least 51`,
@@ -308,12 +340,10 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
   const closes = bars.map((b) => b.close);
   const n = closes.length;
 
-  // Moving averages & RSI arrays
   const ma20Arr = closes.map((_, i) => sma(closes, i, 20));
   const ma50Arr = closes.map((_, i) => sma(closes, i, 50));
   const rsiArr  = computeRSI(closes, 14);
 
-  // Price history for chart
   const priceHistory: PriceBarWithIndicators[] = bars.map((b, i) => ({
     date:   b.date,
     close:  b.close,
@@ -325,7 +355,6 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
     ma50:   ma50Arr[i] !== null ? Math.round(ma50Arr[i]! * 100) / 100 : null,
   }));
 
-  // Current indicators
   const currentPrice = closes[n - 1];
   const ma20         = ma20Arr[n - 1]!;
   const ma50         = ma50Arr[n - 1]!;
@@ -335,54 +364,57 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
     if (rsiArr[i] !== null) { rsi = Math.round(rsiArr[i]! * 100) / 100; break; }
   }
 
-  // Daily change
   const prevClose     = closes[n - 2] ?? currentPrice;
   const change        = Math.round((currentPrice - prevClose) * 100) / 100;
   const changePercent = Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
 
-  // 5-day momentum
   const price5dAgo = closes[Math.max(0, n - 6)];
   const momentum   = Math.round(((currentPrice - price5dAgo) / price5dAgo) * 10000) / 10000;
 
-  // Volume
-  const recentBars   = bars.slice(-20);
-  const volume       = bars[n - 1].volume;
+  const recentBars    = bars.slice(-20);
+  const volume        = bars[n - 1].volume;
   const averageVolume = Math.round(
     recentBars.reduce((s, b) => s + b.volume, 0) / recentBars.length,
   );
   const volumeRatio = Math.round((averageVolume > 0 ? volume / averageVolume : 1) * 10000) / 10000;
 
-  // Component scores
   const trendScore    = computeTrendScore(currentPrice, ma20, ma50);
   const momentumScore = Math.round(computeMomentumScore(currentPrice, price5dAgo) * 10000) / 10000;
   const rsiScore      = computeRsiScore(rsi);
   const volumeScore   = computeVolumeScore(volumeRatio, currentPrice, prevClose);
 
-  // Final score & probabilities
-  const rawFinalScore = aggregateScore(trendScore, momentumScore, rsiScore, volumeScore);
-  const finalScore    = Math.round(rawFinalScore * 10000) / 10000;
+  const { newsScore, socialScore, fundamentalsScore, finnhubContext } = enrichment;
+
+  const rawFinalScore = aggregateScore(
+    trendScore, momentumScore, rsiScore, volumeScore,
+    newsScore, socialScore, fundamentalsScore,
+  );
+  const finalScore = Math.round(rawFinalScore * 10000) / 10000;
 
   const { upProbability, downProbability } = scoreToProb(rawFinalScore);
 
-  // Signal & confidence
   const signal         = mapSignal(upProbability);
   const confidenceTier = mapConfidenceTier(upProbability);
-  const explanation    = buildExplanation(trendScore, momentumScore, rsi, volumeScore, confidenceTier, currentPrice, ma20, ma50);
+  const explanation    = buildExplanation(
+    trendScore, momentumScore, rsi, volumeScore,
+    confidenceTier, currentPrice, ma20, ma50,
+    newsScore, finnhubContext.newsSentimentSummary,
+  );
 
   return {
     ticker,
-    currentPrice:   Math.round(currentPrice * 100) / 100,
-    prevClose:      Math.round(prevClose * 100) / 100,
-    ma20:           Math.round(ma20 * 100) / 100,
-    ma50:           Math.round(ma50 * 100) / 100,
+    currentPrice:      Math.round(currentPrice * 100) / 100,
+    prevClose:         Math.round(prevClose * 100) / 100,
+    ma20:              Math.round(ma20 * 100) / 100,
+    ma50:              Math.round(ma50 * 100) / 100,
     rsi,
-    price5dAgo:     Math.round(price5dAgo * 100) / 100,
+    price5dAgo:        Math.round(price5dAgo * 100) / 100,
     signal,
     confidenceTier,
     explanation,
     change,
     changePercent,
-    lastUpdated:    new Date().toISOString(),
+    lastUpdated:       new Date().toISOString(),
     upProbability,
     downProbability,
     finalScore,
@@ -390,10 +422,14 @@ export function analyzeStock(ticker: string, bars: DailyBar[]): StockAnalysis {
     momentumScore,
     rsiScore,
     volumeScore,
+    newsScore,
+    socialScore,
+    fundamentalsScore,
     momentum,
     volume,
     averageVolume,
     volumeRatio,
+    finnhubContext,
     priceHistory,
   };
 }
