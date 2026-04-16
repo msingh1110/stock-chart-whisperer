@@ -12,7 +12,7 @@ import {
 
 const router: IRouter = Router();
 
-const PORTFOLIO_TICKERS = ["NVDA", "MSFT", "AAPL", "META", "SOFI", "HOOD", "SHEL", "LMT", "IAU", "SLV"];
+const PORTFOLIO_TICKERS = ["NVDA", "MSFT", "AAPL", "META", "SOFI", "HOOD", "SHEL", "LMT"];
 
 interface CacheEntry<T> {
   data: T;

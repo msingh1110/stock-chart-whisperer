@@ -24,8 +24,6 @@ Manny's Terminal analyzes a fixed portfolio of 10 stocks and ETFs in real time, 
 | HOOD | Robinhood Markets |
 | SHEL | Shell plc |
 | LMT | Lockheed Martin |
-| IAU | iShares Gold Trust |
-| SLV | iShares Silver Trust |
 
 ---
 
@@ -196,5 +194,4 @@ pnpm --filter @workspace/api-server run build
 ## Notes
 
 - Social sentiment scoring always returns 0 on Finnhub's free tier (`/stock/social-sentiment` is a premium endpoint)
-- ETFs (IAU, SLV) return 0 for the fundamentals score — no P/E/EPS data is available
 - The signal engine uses no database — all data is live from external APIs with in-memory caching
