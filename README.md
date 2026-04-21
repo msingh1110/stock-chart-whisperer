@@ -18,11 +18,6 @@ The dashboard is hosted on Replit. Open the live link below in any browser — n
 
 **🔗 [https://chart-whisperer.replit.app/](https://chart-whisperer.replit.app/)**
 
-Notes:
-- The link is served by the Replit workspace, so it is only reachable while the Repl is running. If the page does not load, the workspace may be asleep — open the project on Replit and click **Run** to wake it.
-- The API runs on the same host under the `/api/*` path (e.g. `/api/signals`).
-- For a permanent public URL, deploy the project via Replit's **Publish** button — you will get a stable `*.replit.app` domain.
-
 ---
 
 ## Portfolio
