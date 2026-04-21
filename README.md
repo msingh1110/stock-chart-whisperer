@@ -16,7 +16,7 @@ Manny's Terminal analyzes a fixed portfolio of 8 stocks in real time, computing 
 
 The dashboard is hosted on Replit. Open the live link below in any browser — no install required:
 
-**🔗 [https://0b947d54-ac3d-4b25-a5b2-cdfd98cc54e0-00-v8is1shr3nso.spock.replit.dev](https://0b947d54-ac3d-4b25-a5b2-cdfd98cc54e0-00-v8is1shr3nso.spock.replit.dev)**
+**🔗 [https://chart-whisperer.replit.app/](https://chart-whisperer.replit.app/)**
 
 Notes:
 - The link is served by the Replit workspace, so it is only reachable while the Repl is running. If the page does not load, the workspace may be asleep — open the project on Replit and click **Run** to wake it.
