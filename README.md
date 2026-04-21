@@ -8,7 +8,20 @@ A full-stack trading signals dashboard for a curated 10-stock portfolio. Built w
 
 ## Overview
 
-Manny's Terminal analyzes a fixed portfolio of 10 stocks and ETFs in real time, computing a weighted probability score for each ticker using technical indicators, news sentiment, and fundamental data. Every ticker gets a confidence-tiered signal (STRONG BUY → STRONG SELL) with a plain-English explanation of the reasoning.
+Manny's Terminal analyzes a fixed portfolio of 8 stocks in real time, computing a weighted probability score for each ticker using technical indicators, news sentiment, and fundamental data. Every ticker gets a confidence-tiered signal (STRONG BUY → STRONG SELL) with a plain-English explanation of the reasoning.
+
+---
+
+## Live Demo
+
+The dashboard is hosted on Replit. Open the live link below in any browser — no install required:
+
+**🔗 [https://0b947d54-ac3d-4b25-a5b2-cdfd98cc54e0-00-v8is1shr3nso.spock.replit.dev](https://0b947d54-ac3d-4b25-a5b2-cdfd98cc54e0-00-v8is1shr3nso.spock.replit.dev)**
+
+Notes:
+- The link is served by the Replit workspace, so it is only reachable while the Repl is running. If the page does not load, the workspace may be asleep — open the project on Replit and click **Run** to wake it.
+- The API runs on the same host under the `/api/*` path (e.g. `/api/signals`).
+- For a permanent public URL, deploy the project via Replit's **Publish** button — you will get a stable `*.replit.app` domain.
 
 ---
 
