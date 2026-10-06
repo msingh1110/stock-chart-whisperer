@@ -4,7 +4,7 @@ import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfidenceBadge } from "./signal-badge";
 import { cn } from "@/lib/utils";
-import type { StockSignal } from "@workspace/api-client-react/src/generated/api.schemas";
+import type { StockSignal } from "@workspace/api-client-react";
 
 export function getSignalNoteFromValues(
   currentPrice: number,

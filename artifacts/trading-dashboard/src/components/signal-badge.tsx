@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import type { SignalType, ConfidenceTier } from "@workspace/api-client-react/src/generated/api.schemas";
+import type { SignalType, ConfidenceTier } from "@workspace/api-client-react";
 
 interface SignalBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   signal: SignalType;

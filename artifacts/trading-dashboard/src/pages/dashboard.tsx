@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { StockSignal } from "@workspace/api-client-react/src/generated/api.schemas";
+import type { StockSignal } from "@workspace/api-client-react";
 import { resolveTicker, type ResolveResult, type SearchSuggestion } from "@/lib/resolve-ticker";
 
 const REFETCH_INTERVAL = 5 * 60 * 1000;

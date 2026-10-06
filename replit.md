@@ -37,6 +37,18 @@ Full-stack trading signals dashboard powered by the Alpaca Markets API. Displays
 
 ## Key Commands
 
+### Running on Replit
+
+Use the existing managed workflows:
+- `artifacts/api-server: API Server` — starts the Express backend.
+- `artifacts/trading-dashboard: web` — starts the dashboard at `/`.
+
+These workflows supply the required `PORT` and `BASE_PATH` values and route `/api` to the backend. Do not create duplicate workflows or a Vite API proxy.
+
+For a fresh checkout, use Node.js 24, run `pnpm install`, then `pnpm --filter @workspace/api-spec run codegen`. The generator targets React Query v5. Run `pnpm run typecheck` to check all packages.
+
+Live signals require `ALPACA_API_KEY` and `ALPACA_API_SECRET` in Replit Secrets. `FINNHUB_API_KEY` enables news, fundamentals, and company enrichment. Without Alpaca credentials the UI can load, but signal endpoints fail; no simulated market data is substituted. Restart the API workflow after adding credentials.
+
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks from OpenAPI spec
