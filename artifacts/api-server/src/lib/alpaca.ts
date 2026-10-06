@@ -45,7 +45,7 @@ function nDaysAgo(n: number): string {
  * Fetch daily bars for a single ticker over the last ~300 calendar days
  * (which gives roughly 200+ trading days).
  */
-async function fetchBarsForTicker(ticker: string): Promise<DailyBar[]> {
+async function fetchBarsForTicker(ticker: string, splitAdjusted = false): Promise<DailyBar[]> {
   const start = nDaysAgo(300);
   const url = new URL(`${DATA_BASE_URL}/v2/stocks/${encodeURIComponent(ticker)}/bars`);
   url.searchParams.set("timeframe", "1Day");
@@ -53,9 +53,11 @@ async function fetchBarsForTicker(ticker: string): Promise<DailyBar[]> {
   url.searchParams.set("limit", "300");
   url.searchParams.set("feed", "iex");
   url.searchParams.set("sort", "asc");
+  if (splitAdjusted) url.searchParams.set("adjustment", "split");
 
   const res = await fetch(url.toString(), {
     headers: alpacaHeaders(),
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!res.ok) {
@@ -85,13 +87,14 @@ async function fetchBarsForTicker(ticker: string): Promise<DailyBar[]> {
  * Returns a map of ticker -> sorted DailyBar[]
  */
 export async function fetchDailyBars(
-  tickers: string[],
+  tickers: readonly string[],
+  splitAdjusted = false,
 ): Promise<Record<string, DailyBar[]>> {
   logger.info({ tickers }, "Fetching daily bars from Alpaca (individual requests)");
 
   const results = await Promise.all(
     tickers.map(async (ticker) => {
-      const bars = await fetchBarsForTicker(ticker);
+      const bars = await fetchBarsForTicker(ticker, splitAdjusted);
       return { ticker, bars };
     }),
   );

@@ -12,6 +12,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Activity className="h-5 w-5 text-primary" />
             <span className="font-mono font-bold tracking-tight text-lg">Manny's Terminal</span>
           </Link>
+          <nav className="ml-4 flex items-center gap-3 font-mono text-sm">
+            <Link href="/" className="text-muted-foreground hover:text-foreground" data-testid="link-dashboard">Dashboard</Link>
+            <Link href="/evaluation" className="text-muted-foreground hover:text-foreground" data-testid="link-evaluation">Evaluation</Link>
+          </nav>
           <div className="ml-auto flex items-center space-x-4">
             <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
               <span className="relative flex h-2 w-2">

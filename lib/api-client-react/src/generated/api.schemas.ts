@@ -5,6 +5,139 @@
  * Trading signals API powered by Alpaca Markets
  * OpenAPI spec version: 0.1.0
  */
+export type ProbabilityParametersMethod = typeof ProbabilityParametersMethod[keyof typeof ProbabilityParametersMethod];
+
+
+export const ProbabilityParametersMethod = {
+  linear: 'linear',
+  logistic: 'logistic',
+} as const;
+
+export type ProbabilityParametersWeights = {
+  trend: number;
+  momentum: number;
+  rsi: number;
+  volume: number;
+  news: number;
+  social: number;
+  fundamentals: number;
+};
+
+export interface ProbabilityParameters {
+  method: ProbabilityParametersMethod;
+  slope: number;
+  intercept: number;
+  weights: ProbabilityParametersWeights;
+}
+
+export interface ProbabilityModelVersion {
+  id: number;
+  createdAt: string;
+  active: boolean;
+  reason: string;
+  parameters: ProbabilityParameters;
+}
+
+export type ProbabilityMetricsCalibrationItem = {
+  lower: number;
+  upper: number;
+  count: number;
+  predicted: number;
+  observed: number;
+};
+
+export interface ProbabilityMetrics {
+  count: number;
+  brier: number;
+  logLoss: number;
+  accuracy: number;
+  calibration: ProbabilityMetricsCalibrationItem[];
+}
+
+export type ProbabilityReportDecision = typeof ProbabilityReportDecision[keyof typeof ProbabilityReportDecision];
+
+
+export const ProbabilityReportDecision = {
+  insufficient_data: 'insufficient_data',
+  kept: 'kept',
+  promoted: 'promoted',
+} as const;
+
+export interface ProbabilityReport {
+  id: number;
+  week: string;
+  createdAt: string;
+  decision: ProbabilityReportDecision;
+  reason: string;
+  completedCount: number;
+  independentPeriods: number;
+  currentModelId: number;
+  resultingModelId: number;
+  trainCount: number;
+  validationCount: number;
+  testCount: number;
+  currentMetrics: ProbabilityMetrics | null;
+  candidateMetrics: ProbabilityMetrics | null;
+  /** @nullable */
+  baselineBrier: number | null;
+  /** @nullable */
+  improvementLowerBound: number | null;
+  candidateParameters: ProbabilityParameters | null;
+}
+
+export interface ProbabilityPrediction {
+  id: number;
+  ticker: string;
+  asOfDate: string;
+  capturedAt: string;
+  modelId: number;
+  probability: number;
+  referenceClose: number;
+  /** @nullable */
+  outcomeDate: string | null;
+  /** @nullable */
+  outcomeClose: number | null;
+  /** @nullable */
+  outcome: number | null;
+  /** @nullable */
+  returnPercent: number | null;
+}
+
+export type ProbabilityEvaluationStatus = typeof ProbabilityEvaluationStatus[keyof typeof ProbabilityEvaluationStatus];
+
+
+export const ProbabilityEvaluationStatus = {
+  collecting: 'collecting',
+  monitoring: 'monitoring',
+  degraded: 'degraded',
+} as const;
+
+export interface ProbabilityEvaluation {
+  horizonSessions: number;
+  automatic: boolean;
+  schedule: string;
+  status: ProbabilityEvaluationStatus;
+  totalPredictions: number;
+  pendingPredictions: number;
+  completedPredictions: number;
+  minimumIndependentPeriods: number;
+  independentPeriods: number;
+  /** @nullable */
+  lastCapturedAt: string | null;
+  /** @nullable */
+  lastEvaluatedAt: string | null;
+  nextCaptureAt: string;
+  nextEvaluationAt: string;
+  /** @nullable */
+  lastError: string | null;
+  activeModel: ProbabilityModelVersion;
+  modelHistory: ProbabilityModelVersion[];
+  reports: ProbabilityReport[];
+  recentPredictions: ProbabilityPrediction[];
+  observedMetrics: ProbabilityMetrics | null;
+  methodology: string[];
+}
+
 export interface HealthStatus {
   status: string;
 }

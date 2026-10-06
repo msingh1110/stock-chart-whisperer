@@ -9,6 +9,150 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Weekly five-session probability evaluation and automatic model history
+ */
+export const GetProbabilityEvaluationResponse = zod.object({
+  "horizonSessions": zod.number().int(),
+  "automatic": zod.boolean(),
+  "schedule": zod.string(),
+  "status": zod.enum(['collecting', 'monitoring', 'degraded']),
+  "totalPredictions": zod.number().int(),
+  "pendingPredictions": zod.number().int(),
+  "completedPredictions": zod.number().int(),
+  "minimumIndependentPeriods": zod.number().int(),
+  "independentPeriods": zod.number().int(),
+  "lastCapturedAt": zod.string().nullable(),
+  "lastEvaluatedAt": zod.string().nullable(),
+  "nextCaptureAt": zod.string(),
+  "nextEvaluationAt": zod.string(),
+  "lastError": zod.string().nullable(),
+  "activeModel": zod.object({
+  "id": zod.number().int(),
+  "createdAt": zod.string(),
+  "active": zod.boolean(),
+  "reason": zod.string(),
+  "parameters": zod.object({
+  "method": zod.enum(['linear', 'logistic']),
+  "slope": zod.number(),
+  "intercept": zod.number(),
+  "weights": zod.object({
+  "trend": zod.number(),
+  "momentum": zod.number(),
+  "rsi": zod.number(),
+  "volume": zod.number(),
+  "news": zod.number(),
+  "social": zod.number(),
+  "fundamentals": zod.number()
+})
+})
+}),
+  "modelHistory": zod.array(zod.object({
+  "id": zod.number().int(),
+  "createdAt": zod.string(),
+  "active": zod.boolean(),
+  "reason": zod.string(),
+  "parameters": zod.object({
+  "method": zod.enum(['linear', 'logistic']),
+  "slope": zod.number(),
+  "intercept": zod.number(),
+  "weights": zod.object({
+  "trend": zod.number(),
+  "momentum": zod.number(),
+  "rsi": zod.number(),
+  "volume": zod.number(),
+  "news": zod.number(),
+  "social": zod.number(),
+  "fundamentals": zod.number()
+})
+})
+})),
+  "reports": zod.array(zod.object({
+  "id": zod.number().int(),
+  "week": zod.string(),
+  "createdAt": zod.string(),
+  "decision": zod.enum(['insufficient_data', 'kept', 'promoted']),
+  "reason": zod.string(),
+  "completedCount": zod.number().int(),
+  "independentPeriods": zod.number().int(),
+  "currentModelId": zod.number().int(),
+  "resultingModelId": zod.number().int(),
+  "trainCount": zod.number().int(),
+  "validationCount": zod.number().int(),
+  "testCount": zod.number().int(),
+  "currentMetrics": zod.union([zod.object({
+  "count": zod.number().int(),
+  "brier": zod.number(),
+  "logLoss": zod.number(),
+  "accuracy": zod.number(),
+  "calibration": zod.array(zod.object({
+  "lower": zod.number(),
+  "upper": zod.number(),
+  "count": zod.number().int(),
+  "predicted": zod.number(),
+  "observed": zod.number()
+}))
+}),zod.null()]),
+  "candidateMetrics": zod.union([zod.object({
+  "count": zod.number().int(),
+  "brier": zod.number(),
+  "logLoss": zod.number(),
+  "accuracy": zod.number(),
+  "calibration": zod.array(zod.object({
+  "lower": zod.number(),
+  "upper": zod.number(),
+  "count": zod.number().int(),
+  "predicted": zod.number(),
+  "observed": zod.number()
+}))
+}),zod.null()]),
+  "baselineBrier": zod.number().nullable(),
+  "improvementLowerBound": zod.number().nullable(),
+  "candidateParameters": zod.union([zod.object({
+  "method": zod.enum(['linear', 'logistic']),
+  "slope": zod.number(),
+  "intercept": zod.number(),
+  "weights": zod.object({
+  "trend": zod.number(),
+  "momentum": zod.number(),
+  "rsi": zod.number(),
+  "volume": zod.number(),
+  "news": zod.number(),
+  "social": zod.number(),
+  "fundamentals": zod.number()
+})
+}),zod.null()])
+})),
+  "recentPredictions": zod.array(zod.object({
+  "id": zod.number().int(),
+  "ticker": zod.string(),
+  "asOfDate": zod.string(),
+  "capturedAt": zod.string(),
+  "modelId": zod.number().int(),
+  "probability": zod.number(),
+  "referenceClose": zod.number(),
+  "outcomeDate": zod.string().nullable(),
+  "outcomeClose": zod.number().nullable(),
+  "outcome": zod.number().int().nullable(),
+  "returnPercent": zod.number().nullable()
+})),
+  "observedMetrics": zod.union([zod.object({
+  "count": zod.number().int(),
+  "brier": zod.number(),
+  "logLoss": zod.number(),
+  "accuracy": zod.number(),
+  "calibration": zod.array(zod.object({
+  "lower": zod.number(),
+  "upper": zod.number(),
+  "count": zod.number().int(),
+  "predicted": zod.number(),
+  "observed": zod.number()
+}))
+}),zod.null()]),
+  "methodology": zod.array(zod.string())
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

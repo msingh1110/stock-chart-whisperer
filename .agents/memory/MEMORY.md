@@ -1,1 +1,2 @@
 - [Imported workspace setup](imported-workspace-setup.md) — package-install helper can select Node 20; verify the runtime before using newer build tools.
+- [API generator version detection](api-generator-version-detection.md) — catalog dependency versions can be misdetected; pin output targets rather than editing generated files.

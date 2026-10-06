@@ -13,6 +13,24 @@ tags:
   - name: signals
     description: Trading signal operations
 paths:
+  /probability-evaluation:
+    get:
+      operationId: getProbabilityEvaluation
+      tags: [signals]
+      summary: Weekly five-session probability evaluation and automatic model history
+      responses:
+        "200":
+          description: Persistent evaluation state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProbabilityEvaluation"
+        "503":
+          description: Evaluation storage unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
   /healthz:
     get:
       operationId: healthCheck
@@ -101,6 +119,145 @@ paths:
 
 components:
   schemas:
+    ProbabilityParameters:
+      type: object
+      required: [method, slope, intercept, weights]
+      properties:
+        method:
+          type: string
+          enum: [linear, logistic]
+        slope:
+          type: number
+        intercept:
+          type: number
+        weights:
+          type: object
+          required: [trend, momentum, rsi, volume, news, social, fundamentals]
+          properties:
+            trend: { type: number }
+            momentum: { type: number }
+            rsi: { type: number }
+            volume: { type: number }
+            news: { type: number }
+            social: { type: number }
+            fundamentals: { type: number }
+    ProbabilityModelVersion:
+      type: object
+      required: [id, createdAt, active, reason, parameters]
+      properties:
+        id: { type: integer }
+        createdAt: { type: string }
+        active: { type: boolean }
+        reason: { type: string }
+        parameters:
+          $ref: "#/components/schemas/ProbabilityParameters"
+    ProbabilityMetrics:
+      type: object
+      required: [count, brier, logLoss, accuracy, calibration]
+      properties:
+        count: { type: integer }
+        brier: { type: number }
+        logLoss: { type: number }
+        accuracy: { type: number }
+        calibration:
+          type: array
+          items:
+            type: object
+            required: [lower, upper, count, predicted, observed]
+            properties:
+              lower: { type: number }
+              upper: { type: number }
+              count: { type: integer }
+              predicted: { type: number }
+              observed: { type: number }
+    ProbabilityReport:
+      type: object
+      required: [id, week, createdAt, decision, reason, completedCount, independentPeriods, currentModelId, resultingModelId, trainCount, validationCount, testCount, currentMetrics, candidateMetrics, baselineBrier, improvementLowerBound, candidateParameters]
+      properties:
+        id: { type: integer }
+        week: { type: string }
+        createdAt: { type: string }
+        decision:
+          type: string
+          enum: [insufficient_data, kept, promoted]
+        reason: { type: string }
+        completedCount: { type: integer }
+        independentPeriods: { type: integer }
+        currentModelId: { type: integer }
+        resultingModelId: { type: integer }
+        trainCount: { type: integer }
+        validationCount: { type: integer }
+        testCount: { type: integer }
+        currentMetrics:
+          anyOf:
+            - $ref: "#/components/schemas/ProbabilityMetrics"
+            - type: "null"
+        candidateMetrics:
+          anyOf:
+            - $ref: "#/components/schemas/ProbabilityMetrics"
+            - type: "null"
+        baselineBrier: { type: [number, "null"] }
+        improvementLowerBound: { type: [number, "null"] }
+        candidateParameters:
+          anyOf:
+            - $ref: "#/components/schemas/ProbabilityParameters"
+            - type: "null"
+    ProbabilityPrediction:
+      type: object
+      required: [id, ticker, asOfDate, capturedAt, modelId, probability, referenceClose, outcomeDate, outcomeClose, outcome, returnPercent]
+      properties:
+        id: { type: integer }
+        ticker: { type: string }
+        asOfDate: { type: string }
+        capturedAt: { type: string }
+        modelId: { type: integer }
+        probability: { type: number }
+        referenceClose: { type: number }
+        outcomeDate: { type: [string, "null"] }
+        outcomeClose: { type: [number, "null"] }
+        outcome: { type: [integer, "null"] }
+        returnPercent: { type: [number, "null"] }
+    ProbabilityEvaluation:
+      type: object
+      required: [horizonSessions, automatic, schedule, status, totalPredictions, pendingPredictions, completedPredictions, minimumIndependentPeriods, independentPeriods, lastCapturedAt, lastEvaluatedAt, nextCaptureAt, nextEvaluationAt, lastError, activeModel, modelHistory, reports, recentPredictions, observedMetrics, methodology]
+      properties:
+        horizonSessions: { type: integer }
+        automatic: { type: boolean }
+        schedule: { type: string }
+        status:
+          type: string
+          enum: [collecting, monitoring, degraded]
+        totalPredictions: { type: integer }
+        pendingPredictions: { type: integer }
+        completedPredictions: { type: integer }
+        minimumIndependentPeriods: { type: integer }
+        independentPeriods: { type: integer }
+        lastCapturedAt: { type: [string, "null"] }
+        lastEvaluatedAt: { type: [string, "null"] }
+        nextCaptureAt: { type: string }
+        nextEvaluationAt: { type: string }
+        lastError: { type: [string, "null"] }
+        activeModel:
+          $ref: "#/components/schemas/ProbabilityModelVersion"
+        modelHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProbabilityModelVersion"
+        reports:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProbabilityReport"
+        recentPredictions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProbabilityPrediction"
+        observedMetrics:
+          anyOf:
+            - $ref: "#/components/schemas/ProbabilityMetrics"
+            - type: "null"
+        methodology:
+          type: array
+          items: { type: string }
     HealthStatus:
       type: object
       properties:

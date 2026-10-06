@@ -2,22 +2,23 @@
 
 ## Overview
 
-Full-stack trading signals dashboard powered by the Alpaca Markets API. Displays real-time signals for a 6-stock portfolio using technical analysis (MA20/MA50 crossovers + RSI).
+Full-stack trading signals dashboard powered by Alpaca Markets and Finnhub. Displays weighted technical, sentiment and fundamental signals for an eight-stock portfolio, with persistent prospective probability evaluation.
 
 ## Portfolio
 
-**Tickers:** NVDA, MSFT, AAPL, META, SOFI, HOOD
+**Tickers:** NVDA, MSFT, AAPL, META, SOFI, HOOD, SHEL, LMT
 
 ## Trading Strategy
 
 - **MA20** — 20-day Simple Moving Average
 - **MA50** — 50-day Simple Moving Average
-- **RSI(14)** — 14-period Relative Strength Index (Wilder's smoothed method)
+- **RSI(14)** — 14-period Relative Strength Index using rolling average gains/losses
 
 **Signal Logic:**
-- **BUY** → MA20 crosses above MA50 AND RSI < 70
-- **SELL** → MA20 crosses below MA50 AND RSI > 30
-- **HOLD** → otherwise (no crossover or overbought/oversold filter)
+- Seven weighted components: trend, momentum, RSI, volume, news, social and fundamentals.
+- **BUY** → up probability ≥65%; **SELL** → up probability ≤35%; **HOLD** otherwise.
+- Strong-confidence thresholds remain 80% / 20%.
+- Baseline probabilities are a linear score conversion, not empirically calibrated likelihoods. Validated versions can change weights and use logistic calibration.
 
 ## Stack
 
@@ -27,7 +28,7 @@ Full-stack trading signals dashboard powered by the Alpaca Markets API. Displays
 - **TypeScript version**: 5.9
 - **API framework**: Express 5 (TypeScript)
 - **Frontend**: React + Vite + Tailwind CSS + Recharts
-- **Validation**: Zod (`zod/v4`)
+- **Validation**: generated Zod 3 schemas; generator output version is explicitly pinned
 - **API codegen**: Orval (from OpenAPI spec)
 
 ## Artifacts
@@ -54,22 +55,45 @@ Live signals require `ALPACA_API_KEY` and `ALPACA_API_SECRET` in Replit Secrets.
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks from OpenAPI spec
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 - `pnpm --filter @workspace/trading-dashboard run dev` — run frontend locally
+- `pnpm --filter @workspace/api-server run test:probabilities` — deterministic offline evaluation tests
 
 ## API Endpoints
 
-- `GET /api/signals` — all 6 stock signals (cached 5 min)
+- `GET /api/signals` — all 8 stock signals (cached 5 min, keyed by active model version)
 - `GET /api/signals/:ticker` — signal + full price history for one stock
 - `GET /api/portfolio/summary` — BUY/SELL/HOLD count summary
+- `GET /api/probability-evaluation` — persistent collection status, metrics, weekly reports and model history
 
 ## Environment Variables / Secrets
 
 - `ALPACA_API_KEY` — Alpaca Markets API Key ID (required)
 - `ALPACA_API_SECRET` — Alpaca Markets API Secret Key (required)
+- `FINNHUB_API_KEY` — news, fundamentals and company enrichment
+- `DATABASE_URL` — managed PostgreSQL connection for prediction and model history
 - `SESSION_SECRET` — session secret (pre-configured)
 
 ## Data
 
-Fetches ~300 calendar days (~200 trading days) of daily OHLCV bars from Alpaca's IEX feed per ticker using individual REST requests.
+Fetches ~300 calendar days (~200 trading days) of daily OHLCV bars from Alpaca's IEX feed per ticker using individual REST requests. Live signals and evaluation use split-adjusted history; direction labels exclude dividends.
+
+## Weekly Probability Evaluation
+
+**User-selected policy:** predict direction after five trading sessions and automatically apply parameter changes only after validation. Preserve that policy unless the user changes it.
+
+- UI: `/evaluation`. Read-only; no publicly accessible model-changing endpoints.
+- PostgreSQL stores immutable daily features, enrichment context, precise probabilities and model IDs, plus outcomes, weekly reports and versioned parameters.
+- Capture attempts run Mon–Fri at 22:15 UTC; weekly evaluations run Saturdays at 00:30 UTC. A ten-minute internal timer checks due work and runs on startup.
+- Daily capture catches up only within the same UTC evening. Never reconstruct old news or fabricate missed forecasts. Weekly evaluation catches up after a restart.
+- Shared completed portfolio session dates determine the fifth-session target. Missing ticker reference/target bars remain pending; flat outcomes count as not up.
+- Use the latest 12 months of completed observations. Select non-overlapping portfolio outcome windows; require 200 completed observations and 40 such periods. The last eight pre-test periods select candidates, the last twelve periods test them, and earlier periods train them.
+- Promotion requires validation Brier improvement of at least 0.002, held-out improvement of at least 0.005, a win against a training-only base-rate predictor, no worse log loss, and a positive 95% paired portfolio-block bootstrap lower bound.
+- Limit changes to 0.01 transferred between varying component weights, calibration slope changes up to 0.5, intercept changes up to 0.1, and a 28-day promotion cooldown. Keep BUY/SELL thresholds unchanged.
+- Model/report updates are atomic. A PostgreSQL advisory lock prevents concurrent replicas from duplicating scheduler work. Previous model versions are retained.
+- New installations start with no prospective observations; 40 non-overlapping five-session outcome periods take roughly 10–12 months with consistent daily capture. No automatic changes happen during insufficient-data collection.
+- For unattended collection, keep the API continuously running. Replit Reserved VM publishing supports always-on background work; an idle Autoscale deployment can stop the timer. Development Preview alone is not an unattended scheduling guarantee.
+- Development schema command: `pnpm --filter @workspace/db run push`. Publish applies the managed production schema; do not add startup-time schema creation or custom production migrations.
+
+This is research and probability calibration, not automated trade execution or a guarantee of returns.
 
 ## Features
 

@@ -3,6 +3,8 @@ import { fetchDailyBars } from "../lib/alpaca";
 import { analyzeStock } from "../lib/indicators";
 import { enrichWithFinnhub, fetchFundamentalsSnapshot, fetchDetailedNews } from "../lib/finnhub";
 import { getCompanyName } from "../lib/company";
+import { getActiveModel } from "../lib/probability-store";
+import { PORTFOLIO_TICKERS } from "../lib/portfolio";
 import {
   GetAllSignalsResponse,
   GetSignalByTickerParams,
@@ -12,32 +14,32 @@ import {
 
 const router: IRouter = Router();
 
-const PORTFOLIO_TICKERS = ["NVDA", "MSFT", "AAPL", "META", "SOFI", "HOOD", "SHEL", "LMT"];
-
 interface CacheEntry<T> {
   data: T;
   fetchedAt: number;
+  modelId: number;
 }
 const CACHE_TTL_MS = 5 * 60 * 1000;
 let signalsCache: CacheEntry<ReturnType<typeof analyzeStock>[]> | null = null;
 
 async function fetchAllSignals() {
   const now = Date.now();
-  if (signalsCache && now - signalsCache.fetchedAt < CACHE_TTL_MS) {
+  const model = await getActiveModel();
+  if (signalsCache && signalsCache.modelId === model.id && now - signalsCache.fetchedAt < CACHE_TTL_MS) {
     return signalsCache.data;
   }
 
   // Fetch bars and Finnhub enrichments in parallel
   const [barsMap, enrichments] = await Promise.all([
-    fetchDailyBars(PORTFOLIO_TICKERS),
+    fetchDailyBars(PORTFOLIO_TICKERS, true),
     Promise.all(PORTFOLIO_TICKERS.map((t) => enrichWithFinnhub(t))),
   ]);
 
   const analyses = PORTFOLIO_TICKERS.map((ticker, i) =>
-    analyzeStock(ticker, barsMap[ticker] ?? [], enrichments[i]),
+    analyzeStock(ticker, barsMap[ticker] ?? [], enrichments[i], model.parameters),
   );
 
-  signalsCache = { data: analyses, fetchedAt: now };
+  signalsCache = { data: analyses, fetchedAt: now, modelId: model.id };
   return analyses;
 }
 
@@ -92,7 +94,7 @@ router.get("/signals/:ticker", async (req, res): Promise<void> => {
 
   let bars: Awaited<ReturnType<typeof fetchDailyBars>>[string];
   try {
-    const barsMap = await fetchDailyBars([ticker]);
+    const barsMap = await fetchDailyBars([ticker], true);
     bars = barsMap[ticker] ?? [];
   } catch {
     res.status(404).json({ error: `Ticker ${ticker} not found or data unavailable` });
@@ -110,7 +112,8 @@ router.get("/signals/:ticker", async (req, res): Promise<void> => {
     fetchDetailedNews(ticker, 3),
     getCompanyName(ticker),
   ]);
-  const analysis = analyzeStock(ticker, bars, enrichment);
+  const model = await getActiveModel();
+  const analysis = analyzeStock(ticker, bars, enrichment, model.parameters);
   res.json(GetSignalByTickerResponse.parse({ ...analysis, company, fundamentalsSnapshot, latestNews }));
 });
 

@@ -1,5 +1,6 @@
 import { DailyBar } from "./alpaca";
 import { FinnhubEnrichment, FinnhubContext, NULL_ENRICHMENT } from "./finnhub";
+import { DEFAULT_MODEL, predict, weightedScore, type ModelParameters } from "./probability-model";
 
 // ── Simple Indicators ──────────────────────────────────────────────────────
 
@@ -86,17 +87,6 @@ export interface StockAnalysis {
 }
 
 // ── Scoring Config (tune weights & thresholds here) ───────────────────────
-
-const WEIGHTS = {
-  trend:        0.32,
-  momentum:     0.23,
-  rsi:          0.13,
-  volume:       0.15,
-  news:         0.10,
-  social:       0.04,
-  fundamentals: 0.02,
-  // insider: 0.01 — reserved for future use; omitted (always 0)
-} as const;
 
 // upProbability is in 0–100 range throughout
 const THRESHOLDS = {
@@ -329,31 +319,15 @@ function aggregateScore(
   newsScore:         number,
   socialScore:       number,
   fundamentalsScore: number,
+  model: ModelParameters,
 ): number {
-  return (
-    WEIGHTS.trend        * trendScore        +
-    WEIGHTS.momentum     * momentumScore     +
-    WEIGHTS.rsi          * rsiScore          +
-    WEIGHTS.volume       * volumeScore       +
-    WEIGHTS.news         * newsScore         +
-    WEIGHTS.social       * socialScore       +
-    WEIGHTS.fundamentals * fundamentalsScore
-    // + 0.01 * insiderScore (always 0 — reserved)
-  );
+  return weightedScore({
+    trend: trendScore, momentum: momentumScore, rsi: rsiScore, volume: volumeScore,
+    news: newsScore, social: socialScore, fundamentals: fundamentalsScore,
+  }, model);
 }
 
-/**
- * Linear normalization: up_prob = (finalScore + 1) / 2 clamped to [0, 1].
- * Returns probabilities as 0–100 integers for the frontend.
- */
-function scoreToProb(finalScore: number): { upProbability: number; downProbability: number } {
-  const up = Math.max(0, Math.min(1, (finalScore + 1) / 2));
-  return {
-    upProbability:   Math.round(up * 100),
-    downProbability: Math.round((1 - up) * 100),
-  };
-}
-
+/** Classification thresholds stay fixed while weights and calibration are evaluated. */
 function mapSignal(upProbability: number): SignalType {
   if (upProbability >= THRESHOLDS.buy)  return "BUY";
   if (upProbability <= THRESHOLDS.sell) return "SELL";
@@ -374,6 +348,7 @@ export function analyzeStock(
   ticker:     string,
   bars:       DailyBar[],
   enrichment: FinnhubEnrichment = NULL_ENRICHMENT,
+  model: ModelParameters = DEFAULT_MODEL,
 ): StockAnalysis {
   if (bars.length < 51) {
     throw new Error(
@@ -432,10 +407,15 @@ export function analyzeStock(
   const rawFinalScore = aggregateScore(
     trendScore, momentumScore, rsiScore, volumeScore,
     newsScore, socialScore, fundamentalsScore,
+    model,
   );
   const finalScore = Math.round(rawFinalScore * 10000) / 10000;
 
-  const { upProbability, downProbability } = scoreToProb(rawFinalScore);
+  const upProbability = Math.round(predict({
+    trend: trendScore, momentum: momentumScore, rsi: rsiScore, volume: volumeScore,
+    news: newsScore, social: socialScore, fundamentals: fundamentalsScore,
+  }, model) * 100);
+  const downProbability = 100 - upProbability;
 
   const signal         = mapSignal(upProbability);
   const confidenceTier = mapConfidenceTier(upProbability);

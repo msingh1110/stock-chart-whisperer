@@ -24,6 +24,7 @@ import type {
   ApiError,
   HealthStatus,
   PortfolioSummary,
+  ProbabilityEvaluation,
   StockSignal,
   StockSignalDetail
 } from './api.schemas';
@@ -54,6 +55,107 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetProbabilityEvaluationUrl = () => {
+
+
+
+
+  return `/api/probability-evaluation`
+}
+
+/**
+ * @summary Weekly five-session probability evaluation and automatic model history
+ */
+export const getProbabilityEvaluation = async ( options?: Parameters<typeof customFetch>[1]): Promise<ProbabilityEvaluation> => {
+
+  return customFetch<ProbabilityEvaluation>(getGetProbabilityEvaluationUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProbabilityEvaluationQueryKey = () => {
+    return [
+    `/api/probability-evaluation`
+    ] as const;
+    }
+
+
+export const getGetProbabilityEvaluationQueryOptions = <TData = Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProbabilityEvaluationQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProbabilityEvaluation>>> = ({ signal }) => getProbabilityEvaluation({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetProbabilityEvaluationQueryResult = NonNullable<Awaited<ReturnType<typeof getProbabilityEvaluation>>>
+export type GetProbabilityEvaluationQueryError = ErrorType<ApiError>
+
+
+export function useGetProbabilityEvaluation<TData = Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError = ErrorType<ApiError>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getProbabilityEvaluation>>,
+          TError,
+          Awaited<ReturnType<typeof getProbabilityEvaluation>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetProbabilityEvaluation<TData = Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getProbabilityEvaluation>>,
+          TError,
+          Awaited<ReturnType<typeof getProbabilityEvaluation>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetProbabilityEvaluation<TData = Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Weekly five-session probability evaluation and automatic model history
+ */
+
+export function useGetProbabilityEvaluation<TData = Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProbabilityEvaluation>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetProbabilityEvaluationQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getHealthCheckUrl = () => {
 
